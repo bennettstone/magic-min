@@ -4,6 +4,7 @@ MagicMin
 MagicMin is a PHP based javascript and stylesheet minification class designed to generate minified, merged, and automatically updating files to simplify the process of minified file usage and updating when going between production and development environments.
 
 This class has two primary functions:
+
 1. Minification of single files
     * $class->minify( 'sourcefile', 'outputfile', 'version' );
 2. Merging and minifying the contents of whole directories
