@@ -3,7 +3,7 @@
 ** File:		class.magic-min.php
 ** Class:       MagicMin
 ** Description:	Javascript and CSS minification/merging class to simplify movement from development to production versions of files
-** Version:		1.0
+** Version:		2.0
 ** Updated:     01-Jun-2013
 ** Author:		Bennett Stone
 ** Homepage:	www.phpdevtips.com 
@@ -41,16 +41,128 @@ class Minifier {
     public $output_file;
     public $extension;
     private $type;
+    //Return or echo the values
     private $print = true;
+    //base64 images from CSS and include as part of the file?
+    private $merge_images = false;
+    //Max image size for inclusion
+    const IMAGE_MAX_SIZE = 5;
     
     
     /**
      * Construct function
      */
-    public function __construct( $echo = true )
+    public function __construct( $vars = array() )
 	{
-		$this->print = $echo;
+	    if( isset( $vars['echo'] ) )
+	    {
+	        $this->print = $vars['echo'];   
+	    }
+	    if( isset( $vars['encode'] ) )
+	    {
+	        $this->merge_images = $vars['encode'];   
+	    }
 	}
+	
+	
+	/**
+     * Function to seek out and replace image references within CSS with base64_encoded data streams
+     * Used in minify_contents function IF global for $this->merge_images
+     * This function will retrieve the contents of local OR remote images, and is based on 
+     * Matthias Mullie <minify@mullie.eu>'s function, "importFiles" from the JavaScript and CSS minifier
+     * http://www.phpclasses.org/package/7519-PHP-Optimize-JavaScript-and-CSS-files.html
+     *
+     * @access private
+     * @param string $source_file (used for location)
+     * @param string $contents
+     * @return string $updated_style
+     */
+    private function merge_images( $source_file, $contents )
+    {
+        $this->directory = dirname( $source_file ) .'/';
+
+        if( preg_match_all( '/url\((["\']?)((?!["\']?data:).*?\.(gif|png|jpg|jpeg))\\1\)/i', $contents, $this->matches, PREG_SET_ORDER ) )
+        {
+            $this->find = array();
+            $this->replace = array();
+
+            foreach( $this->matches as $this->graphic )
+            {
+
+                $this->extension = pathinfo( $this->graphic[2], PATHINFO_EXTENSION );
+
+                $this->image_file = '';
+
+                //See if the file is remote or local
+                if( preg_match( "/(http|https)/", $this->graphic[2] ) )
+                {
+
+                    //It's remote, and CURL is pretty fast
+                    $ch = curl_init();
+                    curl_setopt( $ch, CURLOPT_URL, $this->graphic[2] );
+                    curl_setopt( $ch, CURLOPT_NOBODY, 1 );
+                    curl_setopt( $ch, CURLOPT_FAILONERROR, 1 );
+                    curl_setopt( $ch, CURLOPT_RETURNTRANSFER, 1 );
+
+                    //And it WAS remote, and it DOES exist
+                    if( curl_exec( $ch ) !== FALSE )
+                    {
+
+                        //Get the image file
+                        $cd = curl_init( $this->graphic[2] );
+                        curl_setopt( $cd, CURLOPT_HEADER, 0 );
+                        curl_setopt( $cd, CURLOPT_RETURNTRANSFER, 1 );
+                        curl_setopt( $cd, CURLOPT_BINARYTRANSFER, 1 );
+                        $this->image_file = curl_exec( $cd );
+                        //Get the remote filesize
+                        $this->filesize = curl_getinfo( $cd, CURLINFO_CONTENT_LENGTH_DOWNLOAD );
+                        curl_close( $cd );
+                        
+                        if( $this->filesize <= Minifier::IMAGE_MAX_SIZE * 1024 )
+                        {
+                            //Assign the find and replace
+                            $this->find[] = $this->graphic[0];
+                            $this->replace[] = 'url(data:'.$this->extension.';base64,'.base64_encode( $this->image_file ).')';   
+                        }
+
+                    } //End file exists
+                    curl_close( $ch );
+                
+                } //End remote file
+                
+                elseif( file_exists( $this->directory . $this->graphic[2] ) )
+                {
+                    //File DOES exist locally, get the contents
+                    
+                    //Check the filesize
+                    $this->filesize = filesize( $this->directory . $this->graphic[2] );
+                    
+                    if( $this->filesize <= Minifier::IMAGE_MAX_SIZE * 1024 )
+                    {
+                        //File is within the filesize requirements so add it
+                        $this->image_file = file_get_contents( $this->directory . $this->graphic[2] );
+
+                        //Assign the find and replace
+                        $this->find[] = $this->graphic[0];
+                        $this->replace[] = 'url(data:'.$this->extension.';base64,'.base64_encode( $this->image_file ).')';   
+                    }
+                
+                } //End local file
+
+            }
+
+            //Find and replace all the images with the base64 data
+            $this->updated_style = str_replace( $this->find, $this->replace, $contents );
+            
+            return $this->updated_style;
+
+        } //End if( regex for images)
+        else
+        {
+            //No images found in the sheet, just return the contents
+            return $contents;
+        }  
+    }
 	
 	/**
      * Private function to handle minification of file contents
@@ -62,19 +174,28 @@ class Minifier {
      */
 	private function minify_contents( $src_file )
 	{
-	    $this->content = file_get_contents( $src_file );
+	    $this->source = file_get_contents( $src_file );
 	    
 	    $this->type = strtolower( pathinfo( $src_file, PATHINFO_EXTENSION ) );
+	    
+	    $this->output = '';
 	    
 	    //If the filename indicates that the contents are already minified, we'll just return the contents
 	    if( preg_match( '/.min./i', $src_file ) )
 	    {
-	        return $this->content;
+	        return $this->source;
 	    }
 	    else
-	    {
+	    {   
 	        if( !empty( $this->type ) && $this->type == 'css' )
             {
+                $this->content = $this->source;
+                //If the param is set to merge images into the css before minifying...
+                if( $this->merge_images )
+                {
+                    $this->content = $this->merge_images( $src_file, $this->content );   
+                }
+                
                 /* remove comments */
                 $this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
                 /* remove tabs, spaces, newlines, etc. */
@@ -86,6 +207,7 @@ class Minifier {
             }
             if( !empty( $this->type ) && $this->type == 'js' )
             {
+                $this->content = $this->source;
                 /* remove comments */
                 $this->content = preg_replace( "/((?:\/\*(?:[^*]|(?:\*+[^*\/]))*\*+\/)|(?:\/\/.*))/", "", $this->content );
                 /* remove tabs, spaces, newlines, etc. */
@@ -93,8 +215,10 @@ class Minifier {
                 /* remove other spaces before/after ) */
                 $this->content = preg_replace( array('(( )+\))','(\)( )+)'), ')', $this->content );
             }
-
-            return $this->content;   
+            
+            //Add to the output and return it
+            $this->output .= $this->content;
+            return $this->output;   
 	    }
 	}
 	
@@ -109,32 +233,38 @@ class Minifier {
      */
     private function make_min( $src_file, $new_file )
     {
-        
-        //Start the output
-        $this->content = '/* Generated '.date('Y-m-d'). ' at '. date('h:i:s A').' */' . PHP_EOL;
 
         //Single files
         if( !is_array( $src_file ) )
         {
-            $this->content .= $this->minify_contents( $src_file );   
+            $this->filetag = '/**' . PHP_EOL;
+            $this->filetag .= ' * Filename: '. $src_file . PHP_EOL;
+            $this->filetag .= ' * Generated '.date('Y-m-d'). ' at '. date('h:i:s A') . PHP_EOL;
+            $this->filetag .= ' */' . PHP_EOL;
+            $this->content = $this->filetag . $this->minify_contents( $src_file );  
         }
         else
         {
-            //Make a temporary var to store the data
-            $this->compiled = '';
+            //Make a temporary var to store the data and write a TOC
+            $this->compiled = '/**' . PHP_EOL;
+            $this->compiled .= ' * Table of contents: ' . PHP_EOL;
+            $this->compiled .= ' * '. implode( PHP_EOL. ' * ', $src_file ) . PHP_EOL;
+            $this->compiled .= ' * Generated: ' . date( 'Y-m-d h:i:s' ). PHP_EOL;
+            $this->compiled .= ' */' . PHP_EOL;
             
             //Loop through an array of files to write to the new file
             foreach( $src_file as $this->new_file )
-            {
-                //Add the sourcefile name for clarity
-                $this->compiled .= PHP_EOL . PHP_EOL . '/* Source file: '.$this->new_file.' */' . PHP_EOL . PHP_EOL;
-                                
+            {                   
                 //Add the sourcefile minified content
+                $this->compiled .= PHP_EOL . PHP_EOL . '/* Filename: '. $this->new_file . ' */' . PHP_EOL;
                 $this->compiled .= $this->minify_contents( $this->new_file );
             }
             
             //Write the temporary contents to the full contents
             $this->content = trim( $this->compiled );
+            
+            //Remove the temporary data
+            unset( $this->compiled );
         }
 
         //Create the new file
@@ -143,9 +273,6 @@ class Minifier {
         //Write the minified contents to it
         fwrite( $this->handle, $this->content );
         fclose( $this->handle );
-        
-        //Remove the temporary data
-        unset( $this->compiled );
 
         //Return filename and location
         return $new_file;

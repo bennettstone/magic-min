@@ -1,9 +1,11 @@
-MagicMin
+Magic Minifier
 =========
 
-MagicMin is a PHP based javascript and stylesheet minification class designed to generate minified, merged, and automatically updating files to simplify the process of minified file usage and updating when going between production and development environments.
+MagicMin is a PHP based javascript and stylesheet minification and merging class.
 
-This class has two primary functions:
+This class is designed to generate minified, merged, and automatically updating files to simplify the process of minified file usage and updating when going between production and development environments.
+
+This class has ~~two~~ three primary functions:
 
 1. Minification of single files
     * $class->minify( 'sourcefile', 'outputfile', 'version' );
@@ -11,22 +13,39 @@ This class has two primary functions:
     * $class->merge( 'outputfile', 'directory', 'type [css, js]', array( 'items to exclude' ), array( 'files to merge and minify in order' ) );
     * The output and minification may be specifically ordered by using the fifth and last parameter, with files passed as an array
     * **Only the files necessary to be prioritized here, and not every file in the directory**
+3. Encoding image file data, replacing external image references within CSS
+    * Only applies to CSS files
+    * Default is false (image references are retained) (See "Basic Usage, item #1")
     
 **This class uses filemtime to determine if and when the minified version should be recreated, and will only create a new minified file IF a file selected for inclusion in the minify or merge functions is newer than the previously created minified file**
 
 Files that contain ".min." in the filename will not have their contents minified, but will still have their contents returned and added to compiled files as normal, as it SHOULD be assumed that those files have already been minified.
 
+Full usage examples are included in example.php, and this package is included with the jqueryui styles in /base, as well as a few misc javascript and bootstrap files for testing.
+
 ##Basic Usage
-First, include and initiate the class.  The class currently accepts one bool, true [default] or false to echo or return the generated filenames.
+First, include and initiate the class.  The class has been updated to use an array with up to 2 key => value pairs, both accept boolean values or can be omitted entirely:
+
+1. Base64 encoded images (**local or remote**) can automatically replace file references during generation.  This applies only to CSS files.
+    * 'encode' => true[false] (default is false)
+    * url() type file paths beginning with "http" or "https" are retrieved and encoded using cURL as opposed to file_get_contents for local files
+2. Echo the resulting generated file path, or return to use as a variable
+    * 'echo' => true[false] (default is true)
 
 ```php
 require( 'class.magic-min.php' );
 
-//Further usage will echo from function calls
+//Default usage will echo from function calls and leave images untouched
 $minified = new Minifier();
 
 //Return data without echo
-$minified = new Minifier( false );
+$minified = new Minifier( array( 'echo' => false ) );
+
+//Echo the resulting file path, while base64_encoding images and including as part of css
+$minified = new Minifier( array( 'encode' => true ) );
+
+//Return only AND encode/include graphics as part of css (gasp)
+$minified = new Minifier( array( 'encode' => true, 'echo' => false ) );
 ```
 
 Output a single minified stylesheet
