@@ -47,6 +47,9 @@ class Minifier {
     private $merge_images = false;
     //Max image size for inclusion
     const IMAGE_MAX_SIZE = 5;
+    //For script execution time (src: http://bit.ly/18O3VWw)
+    private $mtime;
+    private $timer = false;
     
     
     /**
@@ -61,6 +64,11 @@ class Minifier {
 	    if( isset( $vars['encode'] ) )
 	    {
 	        $this->merge_images = $vars['encode'];   
+	    }
+	    if( isset( $vars['timer'] ) && $vars['timer'] == true )
+	    {
+	        $this->timer = true;
+	        $this->mtime = microtime( true );   
 	    }
 	}
 	
@@ -439,6 +447,14 @@ class Minifier {
             return $this->compressed;
         }
         
+    }
+    
+    public function  __destruct()
+    {
+        if( $this->timer )
+        {
+            echo "<script>console.log('Script loaded in ". ( microtime( true ) - $this->mtime )."');</script>";   
+        }
     }
 
 } //End class Minifier

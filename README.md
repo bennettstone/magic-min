@@ -24,13 +24,16 @@ Files that contain ".min." in the filename will not have their contents minified
 Full usage examples are included in example.php, and this package is included with the jqueryui styles in /base, as well as a few misc javascript and bootstrap files for testing.
 
 ##Basic Usage
-First, include and initiate the class.  The class has been updated to use an array with up to 2 key => value pairs, both accept boolean values or can be omitted entirely:
+First, include and initiate the class.  The class has been updated to use an array with up to 3 key -> value pairs, all accept boolean values or can be omitted entirely:
 
 1. Base64 encoded images (**local or remote**) can automatically replace file references during generation.  This applies only to CSS files.
     * 'encode' => true[false] (default is false)
     * url() type file paths beginning with "http" or "https" are retrieved and encoded using cURL as opposed to file_get_contents for local files
 2. Echo the resulting generated file path, or return to use as a variable
     * 'echo' => true[false] (default is true)
+3. Output the total execution time
+    * 'timer' => true[false] (default is false)
+    * Set as part of __destruct to log to the javascript console, adjust as necessary
 
 ```php
 require( 'class.magic-min.php' );

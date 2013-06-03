@@ -17,7 +17,8 @@ require( 'class.magic-min.php' );
 
 //Initialize the class with image encoding
 $vars = array( 
-    'encode' => true
+    'encode' => true, 
+    'timer' => true
 );
 $minified = new Minifier( $vars );
 ?>
@@ -25,7 +26,6 @@ $minified = new Minifier( $vars );
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="EN" lang="EN" dir="ltr">
 <head profile="http://gmpg.org/xfn/11">
     <title>Example Usage | Caching and Minification Class</title>
-    
 
     <!--Output a default minified stylesheet: will output as css/bootstrap.min.css-->
     <link rel="stylesheet" href="<?php $minified->minify( 'css/bootstrap.css' ); ?>" />
