@@ -27,12 +27,12 @@ Full usage examples are included in example.php, and this package is included wi
 First, include and initiate the class.  The class has been updated to use an array with up to 3 key -> value pairs, all accept boolean values or can be omitted entirely:
 
 1. Base64 encoded images (**local or remote**) can automatically replace file references during generation.  This applies only to CSS files.
-    * 'encode' => true[false] (default is false)
+    * 'encode' => true/false (default is false)
     * url() type file paths beginning with "http" or "https" are retrieved and encoded using cURL as opposed to file_get_contents for local files
 2. Echo the resulting generated file path, or return to use as a variable
-    * 'echo' => true[false] (default is true)
+    * 'echo' => true/false (default is true)
 3. Output the total execution time
-    * 'timer' => true[false] (default is false)
+    * 'timer' => true/false (default is false)
     * Set as part of __destruct to log to the javascript console, adjust as necessary
 
 ```php
