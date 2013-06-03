@@ -41,8 +41,17 @@ class Minifier {
     public $output_file;
     public $extension;
     private $type;
+    private $print = true;
     
     
+    /**
+     * Construct function
+     */
+    public function __construct( $echo = true )
+	{
+		$this->print = $echo;
+	}
+	
 	/**
      * Private function to handle minification of file contents
      * Supports CSS and JS files
@@ -55,38 +64,38 @@ class Minifier {
 	{
 	    $this->content = file_get_contents( $src_file );
 	    
-	    $this->type = '';
-        if( preg_match( '/.js/', $src_file ) )
-        {
-            $this->type = 'js';
-        }
-        if( preg_match( '/.css/', $src_file ) )
-        {
-            $this->type = 'css';
-        }
+	    $this->type = strtolower( pathinfo( $src_file, PATHINFO_EXTENSION ) );
 	    
-	    if( !empty( $this->type ) && $this->type == 'css' )
-        {
-            /* remove comments */
-            $this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
-            /* remove tabs, spaces, newlines, etc. */
-            $this->content = str_replace( array("\r\n","\r","\n","\t",'  ','    ','     '), '', $this->content );
-            /* remove other spaces before/after ; */
-            $this->content = preg_replace( array('(( )+{)','({( )+)'), '{', $this->content );
-            $this->content = preg_replace( array('(( )+})','(}( )+)','(;( )*})'), '}', $this->content );
-            $this->content = preg_replace( array('(;( )+)','(( )+;)'), ';', $this->content );
-        }
-        if( !empty( $this->type ) && $this->type == 'js' )
-        {
-            /* remove comments */
-            $this->content = preg_replace( "/((?:\/\*(?:[^*]|(?:\*+[^*\/]))*\*+\/)|(?:\/\/.*))/", "", $this->content );
-            /* remove tabs, spaces, newlines, etc. */
-            $this->content = str_replace( array("\r\n","\r","\t","\n",'  ','    ','     '), '', $this->content );
-            /* remove other spaces before/after ) */
-            $this->content = preg_replace( array('(( )+\))','(\)( )+)'), ')', $this->content );
-        }
-        
-        return $this->content;
+	    //If the filename indicates that the contents are already minified, we'll just return the contents
+	    if( preg_match( '/.min./i', $src_file ) )
+	    {
+	        return $this->content;
+	    }
+	    else
+	    {
+	        if( !empty( $this->type ) && $this->type == 'css' )
+            {
+                /* remove comments */
+                $this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
+                /* remove tabs, spaces, newlines, etc. */
+                $this->content = str_replace( array("\r\n","\r","\n","\t",'  ','    ','     '), '', $this->content );
+                /* remove other spaces before/after ; */
+                $this->content = preg_replace( array('(( )+{)','({( )+)'), '{', $this->content );
+                $this->content = preg_replace( array('(( )+})','(}( )+)','(;( )*})'), '}', $this->content );
+                $this->content = preg_replace( array('(;( )+)','(( )+;)'), ';', $this->content );
+            }
+            if( !empty( $this->type ) && $this->type == 'js' )
+            {
+                /* remove comments */
+                $this->content = preg_replace( "/((?:\/\*(?:[^*]|(?:\*+[^*\/]))*\*+\/)|(?:\/\/.*))/", "", $this->content );
+                /* remove tabs, spaces, newlines, etc. */
+                $this->content = str_replace( array("\r\n","\r","\t","\n",'  ','    ','     '), '', $this->content );
+                /* remove other spaces before/after ) */
+                $this->content = preg_replace( array('(( )+\))','(\)( )+)'), ')', $this->content );
+            }
+
+            return $this->content;   
+	    }
 	}
 	
 	
@@ -100,6 +109,7 @@ class Minifier {
      */
     private function make_min( $src_file, $new_file )
     {
+        
         //Start the output
         $this->content = '/* Generated '.date('Y-m-d'). ' at '. date('h:i:s A').' */' . PHP_EOL;
 
@@ -199,8 +209,15 @@ class Minifier {
             $this->output_file .= '?v='. $version;   
         }
         
-        //Return the output filename
-        echo $this->output_file;
+        //Return the output filename or echo
+        if( $this->print )
+        {
+            echo $this->output_file;
+        }
+        else
+        {
+            return $this->output_file;
+        }
     }   
     
     
@@ -216,13 +233,14 @@ class Minifier {
      * <script src="<?php $min->merge( 'js/one-file-merged.js', 'js', 'js', array( 'js/inline-edit.js', 'js/autogrow.js' ) ); ?>"></script>
      *
      * @access public
-     * @param string output filename
-     * @param string directory to loop through
-     * @param string types
-     * @param array files to exclude
+     * @param string $output_filename
+     * @param string $directory to loop through
+     * @param string $type (css, js - default is js)
+     * @param array $exclude files to exclude
+     * @param array $order to specify output order
      * @return string new filenae
      */
-    public function merge( $output_filename, $directory, $type = 'js',  $exclude = array() )
+    public function merge( $output_filename, $directory, $type = 'js', $exclude = array(), $order = array() )
     {
         //Open the directory for looping and seek out files of appropriate type
         $this->directory = glob( $directory .'/*.'.$type );
@@ -233,9 +251,32 @@ class Minifier {
         //Start the array of files to add to the cache
         $this->compilation = array();
         
+        //Determine if a specific order is needed, if so remove only those files from glob seek
+        if( !empty( $order ) )
+        {
+            foreach( $order as $specified->file )
+            {
+                
+                //Check each file for modification greater than the output file if it exists
+                if( file_exists( $output_filename ) && ( $specified->file != $output_filename ) && ( filemtime( $specified->file ) > filemtime( $output_filename ) ) )
+                {
+                    $this->create_new = true;
+                }
+                
+                //Add the specified files to the beginning of the use array passed to $this->make_min
+                $this->compilation[] = $specified->file;
+                
+            }
+            
+            //Now remove the same files from the glob directory
+            $this->directory = array_diff( $this->directory, $this->compilation );
+        
+        } //End !empty( $order )
+
         //Loop through the directory grabbing files along the way
         foreach( $this->directory as $this->file )
         {
+            
             //Make sure we didn't want to exclude this file before adding it
             if( !in_array( $this->file, $exclude ) && ( $this->file != $output_filename ) )
             {
@@ -247,7 +288,8 @@ class Minifier {
                 
                 $this->compilation[] = $this->file;
             }
-        }
+            
+        } //End foreach( $this->directory )
 
         //Only recreate the file as needed
         if( $this->create_new || !file_exists( $output_filename ) )
@@ -260,7 +302,16 @@ class Minifier {
             $this->compressed = $output_filename;
         }
         
-        echo $this->compressed;
+        //Echo or return
+        if( $this->print )
+        {
+            echo $this->compressed;
+        }
+        else
+        {
+            return $this->compressed;
+        }
+        
     }
 
 } //End class Minifier

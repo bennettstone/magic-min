@@ -35,12 +35,10 @@ $minified = new Minifier();
     <?php
     $exclude = array( 
         'js/autogrow.js', 
-        'js/autogrow.min.js', 
-        'js/jquery.reveal.js', 
-        'js/jquery.reveal.min.js'
+        'js/jquery.reveal.js'
     );
     ?>
-    <script src="<?php $minified->merge( 'js/packed.min.js', 'js', 'js', $exclude ); ?>"></script>
+    <script src="<?php $minified->merge( 'js/packed.min.js', 'js', 'js', $exclude, array( 'js/bootstrap.js', 'js/jquery.validate.js' ) ); ?>"></script>
     
     <!--Get all the stylesheets in a directory and make a single minified stylesheet (excluding the ones used above)-->
     <?php
