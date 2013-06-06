@@ -231,10 +231,25 @@ class Minifier {
 	}
 	
 	
+	/**
+     * Private function to strip directory names from TOC output
+     * Used for make_min()
+     *
+     * @access private
+     * @param array $input
+     * @return array $output
+     */
+    private function strip_directory( $input )
+    {
+        return basename( $input );
+    }
+    
+	
+	
     /**
      * Private function to create file with, or without minified contents
      *
-     * @access public
+     * @access private
      * @param string path to, and name of source file
      * @param string path to, and name of new minified file
      * @return string new filename/location (same as path to variable)
@@ -246,17 +261,20 @@ class Minifier {
         if( !is_array( $src_file ) )
         {
             $this->filetag = '/**' . PHP_EOL;
-            $this->filetag .= ' * Filename: '. $src_file . PHP_EOL;
+            $this->filetag .= ' * Filename: '. basename( $src_file ) . PHP_EOL;
             $this->filetag .= ' * Generated '.date('Y-m-d'). ' at '. date('h:i:s A') . PHP_EOL;
             $this->filetag .= ' */' . PHP_EOL;
             $this->content = $this->filetag . $this->minify_contents( $src_file );  
         }
         else
         {
+            //Strip the directory names from the $src_file array for security
+            $filenames = array_map( array( 'Minifier', 'strip_directory' ), $src_file );
+            
             //Make a temporary var to store the data and write a TOC
             $this->compiled = '/**' . PHP_EOL;
             $this->compiled .= ' * Table of contents: ' . PHP_EOL;
-            $this->compiled .= ' * '. implode( PHP_EOL. ' * ', $src_file ) . PHP_EOL;
+            $this->compiled .= ' * '. implode( PHP_EOL. ' * ', $filenames ) . PHP_EOL;
             $this->compiled .= ' * Generated: ' . date( 'Y-m-d h:i:s' ). PHP_EOL;
             $this->compiled .= ' */' . PHP_EOL;
             
@@ -264,7 +282,7 @@ class Minifier {
             foreach( $src_file as $this->new_file )
             {                   
                 //Add the sourcefile minified content
-                $this->compiled .= PHP_EOL . PHP_EOL . '/* Filename: '. $this->new_file . ' */' . PHP_EOL;
+                $this->compiled .= PHP_EOL . PHP_EOL . '/* Filename: '. basename( $this->new_file ) . ' */' . PHP_EOL;
                 $this->compiled .= $this->minify_contents( $this->new_file );
             }
             
