@@ -147,7 +147,7 @@ For example (within header.php):
 ```php
 $dir = dirname( __FILE__ );
 require_once( $dir .'/includes/class.magic-min.php' );
-$min = new Minifier( false );
+$min = new Minifier( array( 'echo' => false ) );
 ```
 
 Then perform a str_replace operation to regenerate the URI to the stylesheets or javascript files:
