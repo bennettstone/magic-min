@@ -1,12 +1,12 @@
 <?php
 /*------------------------------------------------------------------------------
-** File:		class.magic-min.php
+** File:        class.magic-min.php
 ** Class:       MagicMin
-** Description:	Javascript and CSS minification/merging class to simplify movement from development to production versions of files
-** Version:		2.0
+** Description: Javascript and CSS minification/merging class to simplify movement from development to production versions of files
+** Version:     2.1
 ** Updated:     01-Jun-2013
-** Author:		Bennett Stone
-** Homepage:	www.phpdevtips.com 
+** Author:      Bennett Stone
+** Homepage:    www.phpdevtips.com 
 **------------------------------------------------------------------------------
 ** COPYRIGHT (c) 2013 BENNETT STONE
 **
@@ -50,30 +50,40 @@ class Minifier {
     //For script execution time (src: http://bit.ly/18O3VWw)
     private $mtime;
     private $timer = false;
+    //Output as php with gzip?
+    private $gzip = false;
     
     
     /**
      * Construct function
      */
     public function __construct( $vars = array() )
-	{
-	    if( isset( $vars['echo'] ) )
-	    {
-	        $this->print = $vars['echo'];   
-	    }
-	    if( isset( $vars['encode'] ) )
-	    {
-	        $this->merge_images = $vars['encode'];   
-	    }
-	    if( isset( $vars['timer'] ) && $vars['timer'] == true )
-	    {
-	        $this->timer = true;
-	        $this->mtime = microtime( true );   
-	    }
-	}
+    {
+        //Return vs echo (echo default)
+        if( isset( $vars['echo'] ) && $vars['echo'] == true )
+        {
+            $this->print = $vars['echo'];   
+        }
+        //base64 images and include as part of CSS (default is false)
+        if( isset( $vars['encode'] ) && $vars['encode'] == true )
+        {
+            $this->merge_images = $vars['encode'];   
+        }
+        //Output a timer (defaut is false)
+        if( isset( $vars['timer'] ) && $vars['timer'] == true )
+        {
+            $this->timer = true;
+            $this->mtime = microtime( true );   
+        }
+        //Output files as php with gZip (default is false)
+        if( isset( $vars['gzip'] ) && $vars['gzip'] == true )
+        {
+            $this->gzip = true;
+        }
+    }
 	
 	
-	/**
+    /**
      * Function to seek out and replace image references within CSS with base64_encoded data streams
      * Used in minify_contents function IF global for $this->merge_images
      * This function will retrieve the contents of local OR remote images, and is based on 
@@ -172,7 +182,7 @@ class Minifier {
         }  
     }
 	
-	/**
+    /**
      * Private function to handle minification of file contents
      * Supports CSS and JS files
      *
@@ -180,22 +190,22 @@ class Minifier {
      * @param string $src_file
      * @return string $content
      */
-	private function minify_contents( $src_file )
-	{
-	    $this->source = file_get_contents( $src_file );
+    private function minify_contents( $src_file )
+    {
+        $this->source = file_get_contents( $src_file );
 	    
-	    $this->type = strtolower( pathinfo( $src_file, PATHINFO_EXTENSION ) );
+        $this->type = strtolower( pathinfo( $src_file, PATHINFO_EXTENSION ) );
 	    
-	    $this->output = '';
+        $this->output = '';
 	    
-	    //If the filename indicates that the contents are already minified, we'll just return the contents
-	    if( preg_match( '/.min./i', $src_file ) )
-	    {
-	        return $this->source;
-	    }
-	    else
-	    {   
-	        if( !empty( $this->type ) && $this->type == 'css' )
+        //If the filename indicates that the contents are already minified, we'll just return the contents
+        if( preg_match( '/.min./i', $src_file ) )
+        {
+            return $this->source;
+        }
+        else
+        {   
+            if( !empty( $this->type ) && $this->type == 'css' )
             {
                 $this->content = $this->source;
                 //If the param is set to merge images into the css before minifying...
@@ -227,11 +237,11 @@ class Minifier {
             //Add to the output and return it
             $this->output .= $this->content;
             return $this->output;   
-	    }
-	}
+        }
+    }
 	
 	
-	/**
+    /**
      * Private function to strip directory names from TOC output
      * Used for make_min()
      *
@@ -257,6 +267,46 @@ class Minifier {
     private function make_min( $src_file, $new_file )
     {
 
+        //Output gzip data as needed, but default to none
+        //Lengthy line usage is intentional to provide cleanly formatted fwrite contents
+        $this->prequel = '';
+        if( $this->gzip )
+        {
+            $this->prequel = '<?php' . PHP_EOL;
+            $this->prequel .= 'if( extension_loaded( "zlib" ) )' . PHP_EOL;
+            $this->prequel .= '{' . PHP_EOL;
+            $this->prequel .= '    ob_start( "ob_gzhandler" );' . PHP_EOL;
+            $this->prequel .= '}' . PHP_EOL;
+            $this->prequel .= 'else' . PHP_EOL;
+            $this->prequel .= '{' . PHP_EOL;
+            $this->prequel .= '    ob_start();' . PHP_EOL;
+            $this->prequel .= '}' . PHP_EOL;
+            
+            //Get the actual file type for header
+            $this->extension = strtolower( pathinfo( $new_file, PATHINFO_EXTENSION ) );
+            
+            //Rewrite the file name to indicate php
+            $new_file = $new_file. '.php';
+            
+            if( $this->extension == 'css' )
+            {
+                $this->prequel .= 'header( \'Content-type: text/css; charset: UTF-8\' );' . PHP_EOL;   
+            }
+            if( $this->extension == 'js' )
+            {
+                $this->prequel .= 'header( \'Content-type: application/javascript; charset: UTF-8\' );' . PHP_EOL;   
+            }
+            
+            //Close out the php row so we can continue with normal content
+            $offset = 60 * 60 * 24 * 31;
+            $this->prequel .= 'header( \'Content-Encoding: gzip\' );' . PHP_EOL;
+            $this->prequel .= 'header( \'Cache-Control: max-age=' . $offset.'\' );' . PHP_EOL;
+            $this->prequel .= 'header( \'Expires: ' . gmdate( "D, d M Y H:i:s", time() + $offset ) . ' GMT\' );' . PHP_EOL;
+            $this->prequel .= 'header( \'Last-Modified: ' . gmdate( "D, d M Y H:i:s", filemtime( __FILE__ ) ) . ' GMT\' );' . PHP_EOL;
+            $this->prequel .= '?>' . PHP_EOL;
+            
+        } //End if( $this->gzip )
+        
         //Single files
         if( !is_array( $src_file ) )
         {
@@ -264,7 +314,7 @@ class Minifier {
             $this->filetag .= ' * Filename: '. basename( $src_file ) . PHP_EOL;
             $this->filetag .= ' * Generated '.date('Y-m-d'). ' at '. date('h:i:s A') . PHP_EOL;
             $this->filetag .= ' */' . PHP_EOL;
-            $this->content = $this->filetag . $this->minify_contents( $src_file );  
+            $this->content = $this->prequel . $this->filetag . $this->minify_contents( $src_file );  
         }
         else
         {
@@ -287,7 +337,7 @@ class Minifier {
             }
             
             //Write the temporary contents to the full contents
-            $this->content = trim( $this->compiled );
+            $this->content = trim( $this->prequel . $this->compiled );
             
             //Remove the temporary data
             unset( $this->compiled );

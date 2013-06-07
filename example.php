@@ -18,7 +18,8 @@ require( 'class.magic-min.php' );
 //Initialize the class with image encoding
 $vars = array( 
     'encode' => true, 
-    'timer' => true
+    'timer' => true, 
+    'gzip' => true
 );
 $minified = new Minifier( $vars );
 ?>

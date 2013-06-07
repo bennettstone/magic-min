@@ -5,7 +5,7 @@ MagicMin is a PHP based javascript and stylesheet minification and merging class
 
 This class is designed to generate minified, merged, and automatically updating files to simplify the process of minified file usage and updating when going between production and development environments.
 
-This class has ~~two~~ three primary functions:
+This class has four primary functions:
 
 1. Minification of single files
     * $class->minify( 'sourcefile', 'outputfile', 'version' );
@@ -16,6 +16,9 @@ This class has ~~two~~ three primary functions:
 3. Encoding image file data, replacing external image references within CSS
     * Only applies to CSS files
     * Default is false (image references are retained) (See "Basic Usage, item #1")
+4. Providing generated assets using gzip with specified cache control
+    * zlib Must exist and be enabled, otherwise no gzip will be used
+    * Default expires set to 30 days (60 x 60 x 24 x 31)
     
 **This class uses filemtime to determine if and when the minified version should be recreated, and will only create a new minified file IF a file selected for inclusion in the minify or merge functions is newer than the previously created minified file**
 
@@ -24,7 +27,7 @@ Files that contain ".min." in the filename will not have their contents minified
 Full usage examples are included in example.php, and this package is included with the jqueryui styles in /base, as well as a few misc javascript and bootstrap files for testing.
 
 ##Basic Usage
-First, include and initiate the class.  The class has been updated to use an array with up to 3 key -> value pairs, all accept boolean values or can be omitted entirely:
+First, include and initiate the class.  The class has been updated to use an array with up to 4 key -> value pairs, all accept boolean values or can be omitted entirely:
 
 1. Base64 encoded images (**local or remote**) can automatically replace file references during generation.  This applies only to CSS files.
     * 'encode' => true/false (default is false)
@@ -34,6 +37,8 @@ First, include and initiate the class.  The class has been updated to use an arr
 3. Output the total execution time
     * 'timer' => true/false (default is false)
     * Set as part of __destruct to log to the javascript console, adjust as necessary
+4. Output minified/merged assets using gzip with cache control
+    * 'gzip' => true/false (default is false)
 
 ```php
 require( 'class.magic-min.php' );
@@ -49,6 +54,9 @@ $minified = new Minifier( array( 'encode' => true ) );
 
 //Return only AND encode/include graphics as part of css (gasp)
 $minified = new Minifier( array( 'encode' => true, 'echo' => false ) );
+
+//Include images as part of the css, and gzip
+$minified = new Minifier( array( 'encode' => true, 'gzip' => true ) );
 ```
 
 Output a single minified stylesheet
