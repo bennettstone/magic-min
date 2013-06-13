@@ -146,6 +146,25 @@ $order = array(
 <script src="<?php $minified->merge( 'js/magically-ordered.min.js', 'js', 'js', $exclude, $order ); ?>"></script>
 ```
 
+###Including ONLY specified files in order, disregarding all others
+
+As of 13-Jun-2013, the 3rd parameter of the ->merge() function will now accept an array of files to include.  Files are included in the order specified in the array.
+
+When using an array as the 3rd parameter (as opposed to the "css" or "js" file type), **do not include further parameters as this will create possible conflict.**
+
+```php
+<?php
+$include_only = array(
+    'css/base/jquery.ui.all.css', 
+    'css/base/jquery.ui.base.css', 
+    'css/base/jquery.ui.spinner.css'
+);
+?>
+<link rel="stylesheet" href="<?php $minified->merge( 'css/base/specified-files.css', 'css/base', $include_only ); ?>" />
+```
+
+**NOTE: Files must be the same type (css or js) as different file types will not play nice in the output**
+
 ##Usage within wordpress
 
 Since many MVC frameworks such as wordpress use full URIs to stylesheets and javascript files, it is helpful to first create a variable containing the absolute path to the header.php file, and ensure that the Minifier initiation is set with echo to false.

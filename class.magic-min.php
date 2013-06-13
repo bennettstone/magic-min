@@ -438,16 +438,32 @@ class Minifier {
      * @access public
      * @param string $output_filename
      * @param string $directory to loop through
-     * @param string $type (css, js - default is js)
+     * @param mixed $type (css, js, selective - default is js)
+     **** $type will also accept "selective" array which overrides glob and only includes specified files
+     **** $type array passed files are included in order, and no other files will be included
+     **** files must all be the same type in order to prevent eronious output contents (js and css do not mix)
      * @param array $exclude files to exclude
      * @param array $order to specify output order
      * @return string new filenae
      */
     public function merge( $output_filename, $directory, $type = 'js', $exclude = array(), $order = array() )
     {
-        //Open the directory for looping and seek out files of appropriate type
-        $this->directory = glob( $directory .'/*.'.$type );
-        
+        /**
+         * Added selective inclusion to override glob and exclusion 13-Jun-2013 ala Ray Beriau
+         * This assumes the user has passed an array of filenames, in order rather than a file type
+         * By doing so, we'll set the directory to indicate no contents, and priorize directly into $order
+         */
+        if( is_array( $type ) && !empty( $type ) )
+        {
+            $this->directory = array();
+            $order = $type;
+        }
+        else
+        {
+            //Open the directory for looping and seek out files of appropriate type
+            $this->directory = glob( $directory .'/*.'.$type );            
+        }
+
         //Create a bool to determine if a new file needs to be created
         $this->create_new = false;
         
