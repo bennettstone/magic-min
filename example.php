@@ -6,7 +6,7 @@
  * for stylesheets and javascript files
  *
  * @author Bennett Stone
- * @version 2.2
+ * @version 2.3
  * @date 02-Jun-2013
  * @updated 13-Jun-2013
  * @package MagicMin
@@ -28,15 +28,24 @@ $minified = new Minifier( $vars );
 <head profile="http://gmpg.org/xfn/11">
     <title>Example Usage | Caching and Minification Class</title>
 
-
+    <?php
+    /*
+    
+    <!--Output a new merged stylesheet with only the $included_styles included in order-->
+    <?php
+    $included_styles = array(
+        'css/bootstrap.css', 
+        'https://raw.github.com/zurb/reveal/master/reveal.css', 
+        'css/base/jquery-ui.css'  
+    );
+    ?>
+    <link rel="stylesheet" href="<?php $minified->merge( 'css/awesome.min.css', 'css', $included_styles ); ?>" />
+    
+    
     <!--Output a default minified stylesheet: will output as css/bootstrap.min.css-->
     <link rel="stylesheet" href="<?php $minified->minify( 'css/bootstrap.css' ); ?>" />
     
     
-    <!--Output a minified javascript file: will output as js/autogrow.min.js-->
-    <script src="<?php $minified->minify( 'js/autogrow.js' ); ?>"></script>
-
-
     <!--Output a minified javascript file with completely different name, and ?v=1.8 param-->
     <script src="<?php $minified->minify( 'js/jquery.reveal.js', 'js/jquery-magicreveal.min.js', '1.8' ); ?>"></script>
 
@@ -53,7 +62,7 @@ $minified = new Minifier( $vars );
     );
     ?>
     <script src="<?php $minified->merge( 'js/packed.min.js', 'js', 'js', $exclude, $prioritize ); ?>"></script>
-    
+
 
     <!--Get all the stylesheets in a directory and make a single minified stylesheet (excluding the ones used above)-->
     <?php
@@ -72,14 +81,45 @@ $minified = new Minifier( $vars );
     <!--Include ONLY a specified list of files IN ORDER-->
     <?php
     $include_only = array(
-        'css/base/jquery.ui.all.css', 
-        'css/base/jquery.ui.base.css', 
-        'css/base/jquery.ui.spinner.css'
+        'http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js', 
+        'http://code.jquery.com/jquery-migrate-1.2.1.min.js', 
+        'js/autogrow.js', 
+        'js/jquery.reveal.js', 
+        'js/bootstrap.js'
     );
     ?>
-    <link rel="stylesheet" href="<?php $minified->merge( 'css/base/specified-files.css', 'css/base', $include_only ); ?>" />
+    <script src="<?php $minified->merge( 'js/compressor.min.js', 'js', $include_only ); ?>"></script>
+        
+    */
+    ?>
 </head>
 <body>
 
+    <h1>TESTFILE</h1>
+
+    <a href="#" class="new-modal">Click Me For A Modal</a>
+
+    <div id="myModal" class="reveal-modal">
+         <h1>Modal Title</h1>
+         <p>Any content could go in here.</p>
+         <a class="close-reveal-modal">&#215;</a>
+    </div>
+
+    <textarea name="whatever"></textarea>
+
+    <script type="text/javascript">
+    jQuery(document).ready(function($) {
+        $('textarea').TextAreaExpander(100);
+         $('.new-modal').click(function(e) {
+              e.preventDefault();
+    	  $('#myModal').reveal();
+         });
+    });
+    </script>
+
+<?php
+//Output actions associated with the minification to the console
+$minified->logs();
+?>
 </body>
 </html>

@@ -3,8 +3,8 @@
 ** File:        class.magic-min.php
 ** Class:       MagicMin
 ** Description: Javascript and CSS minification/merging class to simplify movement from development to production versions of files
-** Version:     2.1
-** Updated:     01-Jun-2013
+** Version:     2.3
+** Updated:     13-Jun-2013
 ** Author:      Bennett Stone
 ** Homepage:    www.phpdevtips.com 
 **------------------------------------------------------------------------------
@@ -33,6 +33,15 @@
 **
 ** Normalized output example using merge and minify:
 ** <script src="<?php $min->merge( 'js/production.min.js', 'js', 'js' ); ?>"></script>
+**
+** Adding gzip, base64 image encoding, or returning rather than echo:
+** $vars = array( 
+**    'echo' => false, 
+**    'encode' => true, 
+**    'timer' => true, 
+**    'gzip' => true
+** );
+** $minified = new Minifier( $vars );
 **------------------------------------------------------------------------------ */
 
 class Minifier {
@@ -52,37 +61,88 @@ class Minifier {
     private $timer = false;
     //Output as php with gzip?
     private $gzip = false;
+    //Sum of output messages
+    private $messages = array();
     
     
     /**
      * Construct function
+     * @access public
+     * @param array $vars
+     * @return mixed
      */
     public function __construct( $vars = array() )
     {
+        global $messages;
+        
         //Return vs echo (echo default)
         if( isset( $vars['echo'] ) && $vars['echo'] == true )
         {
+            $this->messages[]['Minifier Log'] = 'Echo for output';
             $this->print = $vars['echo'];   
         }
+        
         //base64 images and include as part of CSS (default is false)
         if( isset( $vars['encode'] ) && $vars['encode'] == true )
         {
+            $this->messages[]['Minifier Log'] = 'Base64encoding enabled';
             $this->merge_images = $vars['encode'];   
         }
+        
         //Output a timer (defaut is false)
         if( isset( $vars['timer'] ) && $vars['timer'] == true )
         {
             $this->timer = true;
             $this->mtime = microtime( true );   
         }
+        
         //Output files as php with gZip (default is false)
         if( isset( $vars['gzip'] ) && $vars['gzip'] == true )
         {
+            $this->messages[]['Minifier Log'] = 'Gzip enabled';
             $this->gzip = true;
         }
+        
+    } //end __construct()
+    
+	
+    /**
+     * Private function to strip directory names from TOC output
+     * Used for make_min()
+     *
+     * @access private
+     * @param array $input
+     * @return array $output
+     */
+    private function strip_directory( $input )
+    {
+        return basename( $input );
     }
-	
-	
+    
+    
+    /**
+     * Private function to determine if files are local or remote
+     * Used for merge_images() and minify() to determine if filemtime can be used
+     *
+     * @access private
+     * @param string $file
+     * @return bool
+     */
+    private function remote_file( $file )
+    {
+        //It is a remote file
+        if( preg_match( "/(http|https)/", $file ) )
+        {
+            return true;
+        }
+        //Local file
+        else
+        {
+            return false;
+        }
+    }
+    
+    
     /**
      * Function to seek out and replace image references within CSS with base64_encoded data streams
      * Used in minify_contents function IF global for $this->merge_images
@@ -97,6 +157,8 @@ class Minifier {
      */
     private function merge_images( $source_file, $contents )
     {
+        global $messages;
+        
         $this->directory = dirname( $source_file ) .'/';
 
         if( preg_match_all( '/url\((["\']?)((?!["\']?data:).*?\.(gif|png|jpg|jpeg))\\1\)/i', $contents, $this->matches, PREG_SET_ORDER ) )
@@ -112,7 +174,7 @@ class Minifier {
                 $this->image_file = '';
 
                 //See if the file is remote or local
-                if( preg_match( "/(http|https)/", $this->graphic[2] ) )
+                if( $this->remote_file( $this->graphic[2] ) )
                 {
 
                     //It's remote, and CURL is pretty fast
@@ -169,6 +231,9 @@ class Minifier {
 
             }
 
+            //Log the number of replacements to the console
+            $this->messages[]['Minifier Log: merge_images'] = count( $this->replace ) .' files base64_encoded into ' . $source_file;
+            
             //Find and replace all the images with the base64 data
             $this->updated_style = str_replace( $this->find, $this->replace, $contents );
             
@@ -179,8 +244,10 @@ class Minifier {
         {
             //No images found in the sheet, just return the contents
             return $contents;
-        }  
-    }
+        }
+        
+    } //end merge_images()
+    
 	
     /**
      * Private function to handle minification of file contents
@@ -188,18 +255,33 @@ class Minifier {
      *
      * @access private
      * @param string $src_file
+     * @param bool $run_minification (default true)
      * @return string $content
      */
-    private function minify_contents( $src_file )
+    private function minify_contents( $src_file, $run_minification = true )
     {
-        $this->source = file_get_contents( $src_file );
-	    
+        global $messages;
+
+        $this->source = @file_get_contents( $src_file );   
+    
+        //Log the error and continue if we can't get the file contents
+        if( !$this->source )
+        {
+            $this->messages[]['Minifier ERROR'] = 'Unable to retrieve the contents of '. $src_file . '.  Skipping at '. __LINE__ .' in '. basename( __FILE__ );
+            
+            //This will cause  potential js errors, but allow the script to continue processing while notifying the user via console
+            $this->source = '';
+        }
+    
         $this->type = strtolower( pathinfo( $src_file, PATHINFO_EXTENSION ) );
-	    
+    
         $this->output = '';
-	    
-        //If the filename indicates that the contents are already minified, we'll just return the contents
-        if( preg_match( '/.min./i', $src_file ) )
+            
+        /**
+         * If the filename indicates that the contents are already minified, we'll just return the contents
+         * If the switch is flipped (useful for loading things such as jquery via google cdn)
+         */
+        if( preg_match( '/.min./i', $src_file ) || $run_minification === false )
         {
             return $this->source;
         }
@@ -226,34 +308,29 @@ class Minifier {
             if( !empty( $this->type ) && $this->type == 'js' )
             {
                 $this->content = $this->source;
-                /* remove comments */
-                $this->content = preg_replace( "/((?:\/\*(?:[^*]|(?:\*+[^*\/]))*\*+\/)|(?:\/\/.*))/", "", $this->content );
-                /* remove tabs, spaces, newlines, etc. */
-                $this->content = str_replace( array("\r\n","\r","\t","\n",'  ','    ','     '), '', $this->content );
-                /* remove other spaces before/after ) */
-                $this->content = preg_replace( array('(( )+\))','(\)( )+)'), ')', $this->content );
+                
+                //remove comments: src: http://gskinner.com/RegExr/?305pt
+                $this->content = preg_replace( '/[ \t]*(?:\/\*(?:.(?!(?<=\*)\/))*\*\/|\/\/[^\n\r]*\n?\r?)/s', '', $this->content );
+                //Remove double and triple spaces
+                $this->content = str_replace( array( '  ','   ', '    ' ), '', $this->content );
+                //Remove tabs, newlines, etc...
+                $this->content = str_replace( array( "\r\n","\r","\n","\t" ), '', $this->content );
+                //Ensure that var references are properly separated
+                $this->content = str_replace( array( ')var ' ), ');var ', $this->content );
+                //Ensure that bracket closings are ended with semicolon
+                $this->content = str_replace( array( '})' ), '});', $this->content );
+                //Since the semicolon ending adds an extra semicolon sometimes, make sure it's cut
+                $this->content = str_replace( array( ';;' ), ';', $this->content );
+                //Add a jQuery prefix to function indicators just in case
+                $this->content = str_replace( '(function($)', 'jQuery(function($)', $this->content );
             }
             
             //Add to the output and return it
             $this->output .= $this->content;
             return $this->output;   
         }
-    }
-	
-	
-    /**
-     * Private function to strip directory names from TOC output
-     * Used for make_min()
-     *
-     * @access private
-     * @param array $input
-     * @return array $output
-     */
-    private function strip_directory( $input )
-    {
-        return basename( $input );
-    }
-    
+        
+    } //end minify_contents()
 	
 	
     /**
@@ -262,11 +339,13 @@ class Minifier {
      * @access private
      * @param string path to, and name of source file
      * @param string path to, and name of new minified file
+     * @param bool $do_minify (default is true) (used for remote files)
      * @return string new filename/location (same as path to variable)
      */
-    private function make_min( $src_file, $new_file )
+    private function make_min( $src_file, $new_file, $do_minify = true )
     {
-
+        global $messages;
+        
         //Output gzip data as needed, but default to none
         //Lengthy line usage is intentional to provide cleanly formatted fwrite contents
         $this->prequel = '';
@@ -285,16 +364,13 @@ class Minifier {
             //Get the actual file type for header
             $this->extension = strtolower( pathinfo( $new_file, PATHINFO_EXTENSION ) );
             
-            //Rewrite the file name to indicate php
-            $new_file = $new_file. '.php';
-            
-            if( $this->extension == 'css' )
+            /**
+             * If gzip is enabled, the .php extension is added automatically
+             * and must be accounted for to prevent files from being recreated
+             */
+            if( $this->extension != 'php' )
             {
-                $this->prequel .= 'header( \'Content-type: text/css; charset: UTF-8\' );' . PHP_EOL;   
-            }
-            if( $this->extension == 'js' )
-            {
-                $this->prequel .= 'header( \'Content-type: application/javascript; charset: UTF-8\' );' . PHP_EOL;   
+                $new_file = $new_file. '.php';   
             }
             
             //Close out the php row so we can continue with normal content
@@ -303,6 +379,18 @@ class Minifier {
             $this->prequel .= 'header( \'Cache-Control: max-age=' . $offset.'\' );' . PHP_EOL;
             $this->prequel .= 'header( \'Expires: ' . gmdate( "D, d M Y H:i:s", time() + $offset ) . ' GMT\' );' . PHP_EOL;
             $this->prequel .= 'header( \'Last-Modified: ' . gmdate( "D, d M Y H:i:s", filemtime( __FILE__ ) ) . ' GMT\' );' . PHP_EOL;
+            
+            //Add the header content type output for correct rendering
+            if( $this->extension == 'css' || ( strpos( $new_file, 'css' ) !== false ) )
+            {
+                $this->prequel .= 'header( \'Content-type: text/css; charset: UTF-8\' );' . PHP_EOL;   
+            }
+            if( $this->extension == 'js' || ( strpos( $new_file, 'js' ) !== false ) )
+            {
+                $this->prequel .= 'header( \'Content-type: application/javascript; charset: UTF-8\' );' . PHP_EOL;   
+            }
+            
+            //Close out the php tag that gets written to the file
             $this->prequel .= '?>' . PHP_EOL;
             
         } //End if( $this->gzip )
@@ -314,7 +402,7 @@ class Minifier {
             $this->filetag .= ' * Filename: '. basename( $src_file ) . PHP_EOL;
             $this->filetag .= ' * Generated '.date('Y-m-d'). ' at '. date('h:i:s A') . PHP_EOL;
             $this->filetag .= ' */' . PHP_EOL;
-            $this->content = $this->prequel . $this->filetag . $this->minify_contents( $src_file );  
+            $this->content = $this->prequel . $this->filetag . $this->minify_contents( $src_file, $do_minify );  
         }
         else
         {
@@ -330,10 +418,23 @@ class Minifier {
             
             //Loop through an array of files to write to the new file
             foreach( $src_file as $this->new_file )
-            {                   
+            {
+                
+                /**
+                 * It's relatively safe to assume that remote files being retrieved
+                 * already have minified contents (ie. Google CDN hosted jquery)
+                 * so prevent re-minification, but default to $do_minify = true;
+                 */
+                $do_minify = true;
+                if( $this->remote_file( $this->new_file ) )
+                {
+                    //Remote files should not have compressed content
+                    $do_minify = false;
+                }
+                
                 //Add the sourcefile minified content
                 $this->compiled .= PHP_EOL . PHP_EOL . '/* Filename: '. basename( $this->new_file ) . ' */' . PHP_EOL;
-                $this->compiled .= $this->minify_contents( $this->new_file );
+                $this->compiled .= $this->minify_contents( $this->new_file, $do_minify );
             }
             
             //Write the temporary contents to the full contents
@@ -341,18 +442,32 @@ class Minifier {
             
             //Remove the temporary data
             unset( $this->compiled );
-        }
+        
+        } //End $src_file is_array
 
         //Create the new file
-        $this->handle = fopen( $new_file, 'w' ) or die( 'Cannot open file:  '.$new_file );
+        $this->handle = fopen( $new_file, 'w' );
+        
+        //Log any error messages from the new file creation
+        if( !$this->handle )
+        {
+            $this->messages[]['Minifier ERROR'] = 'Unable to open file:  '.$new_file;
+            return false;
+        }
+        else
+        {
+            //Write the minified contents to it
+            fwrite( $this->handle, $this->content );
+            fclose( $this->handle );
+            
+            //Log to the console
+            $this->messages[]['Minifier Log: New file'] = 'Successfully created '. $new_file;
 
-        //Write the minified contents to it
-        fwrite( $this->handle, $this->content );
-        fclose( $this->handle );
-
-        //Return filename and location
-        return $new_file;
-    }   
+            //Return filename and location
+            return $new_file;   
+        }
+    
+    } //end make_min()
     
 
     /**
@@ -373,6 +488,7 @@ class Minifier {
      */
     public function minify( $src_file, $file = '', $version = '' )
     {
+        global $messages;
         
         //Since the $file (output) filename is optional, if empty, just add .min.[ext]
         if( empty( $file ) )
@@ -381,29 +497,56 @@ class Minifier {
             $ext = pathinfo( $src_file );
             //Create a new filename
             $file = $ext['dirname'] . '/' . $ext['filename'] . '.min.' . $ext['extension'];
+
         }
         
+        //If we have gzip enabled, we must account for the .php extension
+        if( $this->gzip && ( strtolower( pathinfo( $file, PATHINFO_EXTENSION ) ) != '.php' ) )
+        {
+            $file .= '.php';
+        }
+        
+        //The source file is remote, and we can't check for an updated version anyway
+        if( $this->remote_file( $src_file ) && file_exists( $file ) )
+        {
+            $this->output_file = $file;
+        }
+        //The local version doesn't exist, but we don't need to minify
+        elseif( $this->remote_file( $src_file ) && !file_exists( $file ) )
+        {
+            $this->output_file = $this->make_min( $src_file, $file, false );
+            
+            //Add the filename to the output log
+            $this->messages[]['Minifier Log: minify'] = 'Retrieving contents of '.$src_file .' to add to '.$file;
+        }
         //The file already exists and doesn't need to be recreated
-        if( file_exists( $file ) && ( filemtime( $src_file ) < filemtime( $file ) ) )
+        elseif( ( file_exists( $file ) && file_exists( $src_file ) ) && ( filemtime( $src_file ) < filemtime( $file ) ) )
         {
             //No change, so the output is the same as the input
             $this->output_file = $file;
 
         }
         //The file exists, but the development version is newer
-        elseif( file_exists( $file ) && ( filemtime( $src_file ) > filemtime( $file ) ) )
+        elseif( ( file_exists( $file ) && file_exists( $src_file ) ) && ( filemtime( $src_file ) > filemtime( $file ) ) )
         {
             //Remove the file so we can do a clean recreate
+            chmod( $file, 0777 );
             unlink( $file );
             
             //Make the cached version
             $this->output_file = $this->make_min( $src_file, $file );
+            
+            //Add to the console.log output
+            $this->messages[]['Minifier Log: minify'] = 'Made new version of '.$src_file.' into '.$file;
         }
         //The minified file doesn't exist, make one
         else
         {
             //Make the cached version
             $this->output_file = $this->make_min( $src_file, $file );
+            
+            //Add to the console.log output if desired
+            $this->messages[]['Minifier Log: minify'] = 'Made new version of '.$src_file.' into '.$file;
         }
 
         //Add the ? params if they exist
@@ -421,7 +564,8 @@ class Minifier {
         {
             return $this->output_file;
         }
-    }   
+        
+    } //end minify() 
     
     
     /**
@@ -438,30 +582,43 @@ class Minifier {
      * @access public
      * @param string $output_filename
      * @param string $directory to loop through
-     * @param mixed $type (css, js, selective - default is js)
-     **** $type will also accept "selective" array which overrides glob and only includes specified files
-     **** $type array passed files are included in order, and no other files will be included
+     * @param mixed $list_or_type (css, js, selective - default is js)
+     **** $list_or_type will also accept "selective" array which overrides glob and only includes specified files
+     **** $list_or_type array passed files are included in order, and no other files will be included
      **** files must all be the same type in order to prevent eronious output contents (js and css do not mix)
      * @param array $exclude files to exclude
      * @param array $order to specify output order
      * @return string new filenae
      */
-    public function merge( $output_filename, $directory, $type = 'js', $exclude = array(), $order = array() )
+    public function merge( $output_filename, $directory, $list_or_type = 'js', $exclude = array(), $order = array() )
     {
+        global $messages;
+        
         /**
          * Added selective inclusion to override glob and exclusion 13-Jun-2013 ala Ray Beriau
          * This assumes the user has passed an array of filenames, in order rather than a file type
          * By doing so, we'll set the directory to indicate no contents, and priorize directly into $order
          */
-        if( is_array( $type ) && !empty( $type ) )
+        if( is_array( $list_or_type ) && !empty( $list_or_type ) )
         {
+            //Direct the directory to be an empty array
             $this->directory = array();
-            $order = $type;
+            //Utilize the $order variable
+            $order = $list_or_type;
         }
         else
         {
             //Open the directory for looping and seek out files of appropriate type
-            $this->directory = glob( $directory .'/*.'.$type );            
+            $this->directory = glob( $directory .'/*.'.$list_or_type );            
+        }
+        
+        /**
+         * Reassign the $output_filename if gzip is enabled as we must account for the .php
+         * extension in order to prevent the file from being recreated
+         */
+        if( $this->gzip && ( strtolower( pathinfo( $output_filename, PATHINFO_EXTENSION ) ) != '.php' ) )
+        {
+            $output_filename .= '.php';
         }
 
         //Create a bool to determine if a new file needs to be created
@@ -477,8 +634,9 @@ class Minifier {
             {
                 
                 //Check each file for modification greater than the output file if it exists
-                if( file_exists( $output_filename ) && ( $specified->file != $output_filename ) && ( filemtime( $specified->file ) > filemtime( $output_filename ) ) )
+                if( file_exists( $output_filename ) && ( $specified->file != $output_filename ) && ( !$this->remote_file( $specified->file ) ) && ( filemtime( $specified->file ) > filemtime( $output_filename ) ) )
                 {
+                    $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $specified->file;
                     $this->create_new = true;
                 }
                 
@@ -500,8 +658,9 @@ class Minifier {
             if( !in_array( $this->file, $exclude ) && ( $this->file != $output_filename ) )
             {
                 //Check each file for modification greater than the output file if it exists
-                if( file_exists( $output_filename ) && ( filemtime( $this->file ) > filemtime( $output_filename ) ) )
+                if( file_exists( $output_filename ) && ( !$this->remote_file( $this->file ) ) && ( filemtime( $this->file ) > filemtime( $output_filename ) ) )
                 {
+                    $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
                     $this->create_new = true;
                 }
                 
@@ -531,14 +690,43 @@ class Minifier {
             return $this->compressed;
         }
         
-    }
+    } //end merge()
     
-    public function  __destruct()
+    
+    /**
+     * Output any return data to the javascript console/source of page
+     * Usage (assuming minifier is initiated as $minifier):
+     * <?php $minifier->logs(); ?>
+     *
+     * @param none
+     * @return string
+     */
+    public function logs()
     {
+        global $messages;
+        
+        //Add the timer the console.log output if desired
         if( $this->timer )
         {
-            echo "<script>console.log('Script loaded in ". ( microtime( true ) - $this->mtime )."');</script>";   
+            $this->messages[]['Minifier Log: timer'] = 'MagicMin processed and loaded in '. ( microtime( true ) - $this->mtime ) .' seconds';
         }
-    }
+        
+        if( !empty( $this->messages ) )
+        {
+            
+            echo '<script>';
+            foreach( $this->messages as $this->data )
+            {
+                foreach( $this->data as $this->type => $this->output )
+                {
+                    echo 'console.log("'.$this->type .' : '. $this->output.'");' . PHP_EOL;   
+                }
+            }
+            echo '</script>';
+        
+        } //end !empty( $this-messages )
+
+    } //end logs()
+    
 
 } //End class Minifier

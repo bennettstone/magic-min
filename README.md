@@ -125,6 +125,38 @@ $exclude_styles = array(
 <link rel="stylesheet" href="<?php $minified->merge( 'css/master.min.css', 'css', 'css', $exclude_styles ); ?>" />
 ```
 
+###Viewing actions taken by MagicMin
+
+To provide more transparency, the "logs()" function has been added, and can output console.log messages to the page where MagicMin is used to be viewed in the source code of the page, or within the javascript console.
+
+If used, this function should only be requested after all other output has taken place by the magicmin script, ie...
+
+```html
+<html>
+    <head>
+        
+        <?php $minified = new Minifier( array( 'gzip' => true, 'timer' => true ) ); ?>
+        
+        <script src="<?php $minified->merge( 'js/my-new-file.min.js', 'javascript-directory', 'js' ); ?>"></script>
+    </head>
+    <body>
+    
+        <h1>your content here</h1>
+    
+        <?php $minified->logs(); ?>
+    
+    </body>
+</html>
+```
+
+Which would output to the console something such as:
+
+```text
+Minifier Log : Timer enabled
+Minifier Log : Gzip enabled
+Minifier Log: timer : MagicMin processed and loaded in 0.00019097328186 seconds
+```
+
 ###Specifying the order of included files when using "merge"
 
 Since it's simply not practical to assume glob() is going to determine dependencies, a fifth parameter exists for the merge() function.
@@ -150,7 +182,7 @@ $order = array(
 
 As of 13-Jun-2013, the 3rd parameter of the ->merge() function will now accept an array of files to include.  Files are included in the order specified in the array.
 
-When using an array as the 3rd parameter (as opposed to the "css" or "js" file type), **do not include further parameters as this will create possible conflict.**
+When using an array as the 3rd parameter (as opposed to the "css" or "js" file type), **DO NOT include further parameters as this will create possible conflict.**
 
 ```php
 <?php
