@@ -6,20 +6,21 @@
  * for stylesheets and javascript files
  *
  * @author Bennett Stone
- * @version 2.3
+ * @version 2.4
  * @date 02-Jun-2013
- * @updated 13-Jun-2013
+ * @updated 15-Jun-2013
  * @package MagicMin
  **/
 
 //Include the caching/minification class
 require( 'class.magic-min.php' );
 
-//Initialize the class with image encoding
+//Initialize the class with image encoding, gzip, a timer, and use the google closure API
 $vars = array( 
     'encode' => true, 
     'timer' => true, 
-    'gzip' => true
+    'gzip' => true, 
+    'closure' => true
 );
 $minified = new Minifier( $vars );
 ?>
