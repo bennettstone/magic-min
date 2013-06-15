@@ -76,10 +76,14 @@ class Minifier {
         global $messages;
         
         //Return vs echo (echo default)
-        if( isset( $vars['echo'] ) && $vars['echo'] == true )
+        if( isset( $vars['echo'] ) && $vars['echo'] == false )
         {
             $this->messages[]['Minifier Log'] = 'Echo for output';
-            $this->print = $vars['echo'];   
+            $this->print = false;   
+        }
+        else
+        {
+            $this->print = true;
         }
         
         //base64 images and include as part of CSS (default is false)
