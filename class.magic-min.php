@@ -1,12 +1,14 @@
 <?php
 /*------------------------------------------------------------------------------
-** File:        class.magic-min.php
-** Class:       MagicMin
-** Description: Javascript and CSS minification/merging class to simplify movement from development to production versions of files
-** Version:     2.3
-** Updated:     13-Jun-2013
-** Author:      Bennett Stone
-** Homepage:    www.phpdevtips.com 
+** File:            class.magic-min.php
+** Class:           MagicMin
+** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
+** Dependencies:    jsMin (https://github.com/rgrove/jsmin-php)
+** Version:         2.4
+** Created:         01-Jun-2013
+** Updated:         15-Jun-2013
+** Author:          Bennett Stone
+** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
 ** COPYRIGHT (c) 2013 BENNETT STONE
 **
@@ -42,6 +44,15 @@
 **    'gzip' => true
 ** );
 ** $minified = new Minifier( $vars );
+**
+** Using google closure for js minification as opposed to jsmin (default is jsmin)
+** $vars = array(
+**   'closure' => true, 
+**   'gzip' => true, 
+**   'encode' => true
+** );
+** $minified = new Minifier( $vars );
+**
 **------------------------------------------------------------------------------ */
 
 class Minifier {
@@ -54,6 +65,8 @@ class Minifier {
     private $print = true;
     //base64 images from CSS and include as part of the file?
     private $merge_images = false;
+    //Use google closure (utilizes cURL)
+    private $use_closure = false;
     //Max image size for inclusion
     const IMAGE_MAX_SIZE = 5;
     //For script execution time (src: http://bit.ly/18O3VWw)
@@ -105,6 +118,12 @@ class Minifier {
         {
             $this->messages[]['Minifier Log'] = 'Gzip enabled';
             $this->gzip = true;
+        }
+        
+        //Use google closure API via cURL (defaults to false and will rely on jsmin.php)
+        if( isset( $vars['closure'] ) && $vars['closure'] == true )
+        {
+            $this->use_closure = true;
         }
         
     } //end __construct()
@@ -308,26 +327,75 @@ class Minifier {
                 $this->content = preg_replace( array('(( )+{)','({( )+)'), '{', $this->content );
                 $this->content = preg_replace( array('(( )+})','(}( )+)','(;( )*})'), '}', $this->content );
                 $this->content = preg_replace( array('(;( )+)','(( )+;)'), ';', $this->content );
-            }
+
+            } //end $this->type == 'css'
+            
             if( !empty( $this->type ) && $this->type == 'js' )
             {
                 $this->content = $this->source;
                 
-                //remove comments: src: http://gskinner.com/RegExr/?305pt
-                $this->content = preg_replace( '/[ \t]*(?:\/\*(?:.(?!(?<=\*)\/))*\*\/|\/\/[^\n\r]*\n?\r?)/s', '', $this->content );
-                //Remove double and triple spaces
-                $this->content = str_replace( array( '  ','   ', '    ' ), '', $this->content );
-                //Remove tabs, newlines, etc...
-                $this->content = str_replace( array( "\r\n","\r","\n","\t" ), '', $this->content );
-                //Ensure that var references are properly separated
-                $this->content = str_replace( array( ')var ' ), ');var ', $this->content );
-                //Ensure that bracket closings are ended with semicolon
-                $this->content = str_replace( array( '})' ), '});', $this->content );
-                //Since the semicolon ending adds an extra semicolon sometimes, make sure it's cut
-                $this->content = str_replace( array( ';;' ), ';', $this->content );
-                //Add a jQuery prefix to function indicators just in case
-                $this->content = str_replace( '(function($)', 'jQuery(function($)', $this->content );
-            }
+                /**
+                 * Migrated preg_replace and str_replace custom minification to use google closure API
+                 * OR jsMin on 15-Jun-2013 due to js minification irregularities with most regex's: 
+                 * https://github.com/rgrove/jsmin-php/
+                 * https://developers.google.com/closure/compiler/
+                 * Accomodates lack of local file for jsmin by getting contents from github
+                 * and writing to a local file for the class (just in case)
+                 * If bool is passed for 'closure' => true during class initiation, cURL request processes
+                 */
+                if( $this->use_closure )
+                {
+                    
+                    //Build the data array
+                    $data = array(
+                        'compilation_level' => 'SIMPLE_OPTIMIZATIONS',
+                        'output_format' => 'text', 
+                        'output_info' => 'compiled_code', 
+                        'js_code' => urlencode( $this->content )
+                    );
+
+                    //Compile it into a post compatible format
+                    $fields_string = '';
+                    foreach( $data as $key => $value )
+                    {
+                        $fields_string .= $key . '=' . $value . '&';
+                    }
+                    rtrim( $fields_string, '&' );
+                    
+                    //Initiate and execute the curl request
+                    $h = curl_init();
+                    curl_setopt( $h, CURLOPT_URL, 'http://closure-compiler.appspot.com/compile' ); 
+                    curl_setopt( $h, CURLOPT_POST, true );
+                    curl_setopt( $h, CURLOPT_POSTFIELDS, $fields_string );
+                    curl_setopt( $h, CURLOPT_HEADER, false );
+                    curl_setopt( $h, CURLOPT_RETURNTRANSFER, 1 );
+                    $result = curl_exec( $h );
+                    $this->content = $result;
+
+                    //close connection
+                    curl_close( $h );
+                    
+                } //end if( $this->use_closure )
+                else
+                {
+                    //Not using google closure, default to jsmin but make sure the file exists
+                    if( !file_exists( dirname( __FILE__ ) .'/jsmin.php' ) )
+                    {
+                        $this->handle = fopen( dirname( __FILE__ ) .'/jsmin.php', 'w' );
+                        $this->jsmin = file_get_contents( 'https://raw.github.com/rgrove/jsmin-php/master/jsmin.php' );
+                        fwrite( $this->handle, $this->jsmin );
+                        fclose( $this->handle );
+                    }
+                
+                    //Include jsmin
+                    require_once( dirname( __FILE__ ) .'/jsmin.php' );
+                
+                    //Minify the javascript
+                    $this->content = JSMin::minify( $this->content );
+
+                } //end if( !$this->use_closure )
+
+            } //end $this->type == 'js'
             
             //Add to the output and return it
             $this->output .= $this->content;

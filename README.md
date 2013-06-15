@@ -26,6 +26,14 @@ Files that contain ".min." in the filename will not have their contents minified
 
 Full usage examples are included in example.php, and this package is included with the jqueryui styles in /base, as well as a few misc javascript and bootstrap files for testing.
 
+Regular expressions and str_replace operators were removed 15-Jun-2013 for javascript minification due to inconsistencies, and have been replaced with:
+
+1. [JsMin](https://github.com/rgrove/jsmin-php) as the default
+    * If the jsmin.php file is not found in the same directory as class.magic-min.php, it will be retrieved from github and created in the same directory
+    * JsMin is the default minification package used for javascript
+2. [Google Closure](https://developers.google.com/closure/compiler/)
+    * To use google closure, add 'closure' => true to the class initation
+
 ##Basic Usage
 First, include and initiate the class.  The class has been updated to use an array with up to 4 key -> value pairs, all accept boolean values or can be omitted entirely:
 
@@ -39,6 +47,8 @@ First, include and initiate the class.  The class has been updated to use an arr
     * Set as part of __destruct to log to the javascript console, adjust as necessary
 4. Output minified/merged assets using gzip with cache control
     * 'gzip' => true/false (default is false)
+5. Use the Google Closure API as opposed to jsmin (jsmin is default)
+    * 'closure' => true (default is false)
 
 ```php
 require( 'class.magic-min.php' );
@@ -57,6 +67,9 @@ $minified = new Minifier( array( 'encode' => true, 'echo' => false ) );
 
 //Include images as part of the css, and gzip
 $minified = new Minifier( array( 'encode' => true, 'gzip' => true ) );
+
+//Use google closure API, and gzip the resulting file
+$minified = new Minifier( array( 'gzip' => true, 'closure' => true ) );
 ```
 
 Output a single minified stylesheet
