@@ -6,7 +6,7 @@
  * for stylesheets and javascript files
  *
  * @author Bennett Stone
- * @version 2.4
+ * @version 2.4.1
  * @date 02-Jun-2013
  * @updated 15-Jun-2013
  * @package MagicMin

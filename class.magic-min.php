@@ -4,9 +4,9 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jsMin (https://github.com/rgrove/jsmin-php)
-** Version:         2.4
+** Version:         2.4.1
 ** Created:         01-Jun-2013
-** Updated:         15-Jun-2013
+** Updated:         18-Jun-2013
 ** Author:          Bennett Stone
 ** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
@@ -45,9 +45,9 @@
 ** );
 ** $minified = new Minifier( $vars );
 **
-** Using google closure for js minification as opposed to jsmin (default is jsmin)
+** Using jsmin for js minification as opposed to google closure (default set to google closure)
 ** $vars = array(
-**   'closure' => true, 
+**   'closure' => false, 
 **   'gzip' => true, 
 **   'encode' => true
 ** );
@@ -66,7 +66,7 @@ class Minifier {
     //base64 images from CSS and include as part of the file?
     private $merge_images = false;
     //Use google closure (utilizes cURL)
-    private $use_closure = false;
+    private $use_closure = true;
     //Max image size for inclusion
     const IMAGE_MAX_SIZE = 5;
     //For script execution time (src: http://bit.ly/18O3VWw)
@@ -123,6 +123,7 @@ class Minifier {
         //Use google closure API via cURL (defaults to false and will rely on jsmin.php)
         if( isset( $vars['closure'] ) && $vars['closure'] == true )
         {
+            $this->messages[]['Minifier Log'] = 'Google Closure API enabled';
             $this->use_closure = true;
         }
         
@@ -702,18 +703,21 @@ class Minifier {
         //Determine if a specific order is needed, if so remove only those files from glob seek
         if( !empty( $order ) )
         {
-            foreach( $order as $specified->file )
+            
+            $this->messages[]['Minifier Log: Merge order'] = 'Order specified with '. count( $order ) .' files';
+            
+            foreach( $order as $this->file )
             {
                 
                 //Check each file for modification greater than the output file if it exists
-                if( file_exists( $output_filename ) && ( $specified->file != $output_filename ) && ( !$this->remote_file( $specified->file ) ) && ( filemtime( $specified->file ) > filemtime( $output_filename ) ) )
+                if( file_exists( $output_filename ) && ( $this->file != $output_filename ) && ( !$this->remote_file( $this->file ) ) && ( filemtime( $this->file ) > filemtime( $output_filename ) ) )
                 {
-                    $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $specified->file;
+                    $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
                     $this->create_new = true;
                 }
                 
                 //Add the specified files to the beginning of the use array passed to $this->make_min
-                $this->compilation[] = $specified->file;
+                $this->compilation[] = $this->file;
                 
             }
             
