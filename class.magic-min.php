@@ -45,7 +45,7 @@
 ** );
 ** $minified = new Minifier( $vars );
 **
-** Using jsmin for js minification as opposed to google closure (default set to google closure)
+** Using JShrink for js minification as opposed to google closure (default set to google closure)
 ** $vars = array(
 **   'closure' => false, 
 **   'gzip' => true, 
@@ -120,11 +120,16 @@ class Minifier {
             $this->gzip = true;
         }
         
-        //Use google closure API via cURL (defaults to false and will rely on jsmin.php)
+        //Use google closure API via cURL (defaults to false and will rely on jShrink-Minifier.php)
         if( isset( $vars['closure'] ) && $vars['closure'] == true )
         {
             $this->messages[]['Minifier Log'] = 'Google Closure API enabled';
             $this->use_closure = true;
+        }
+        else
+        {
+            $this->messages[]['Minifier Log'] = 'jShrink enabled';
+            $this->use_closure = false;
         }
         
     } //end __construct()
@@ -338,9 +343,9 @@ class Minifier {
                 /**
                  * Migrated preg_replace and str_replace custom minification to use google closure API
                  * OR jsMin on 15-Jun-2013 due to js minification irregularities with most regex's: 
-                 * https://github.com/rgrove/jsmin-php/
+                 * https://github.com/tedivm/JShrink
                  * https://developers.google.com/closure/compiler/
-                 * Accomodates lack of local file for jsmin by getting contents from github
+                 * Accomodates lack of local file for JShrink by getting contents from github
                  * and writing to a local file for the class (just in case)
                  * If bool is passed for 'closure' => true during class initiation, cURL request processes
                  */
@@ -379,20 +384,22 @@ class Minifier {
                 } //end if( $this->use_closure )
                 else
                 {
-                    //Not using google closure, default to jsmin but make sure the file exists
-                    if( !file_exists( dirname( __FILE__ ) .'/jsmin.php' ) )
+                    //Not using google closure, default to JShrink but make sure the file exists
+                    if( !file_exists( dirname( __FILE__ ) .'/jShrink.php' ) )
                     {
-                        $this->handle = fopen( dirname( __FILE__ ) .'/jsmin.php', 'w' );
-                        $this->jsmin = file_get_contents( 'https://raw.github.com/rgrove/jsmin-php/master/jsmin.php' );
-                        fwrite( $this->handle, $this->jsmin );
+                        $this->messages[]['Minifier Log'] = 'jShrink does not exist locally.  Retrieving...';
+                        
+                        $this->handle = fopen( dirname( __FILE__ ) .'/jShrink.php', 'w' );
+                        $this->jshrink = file_get_contents( 'https://raw.github.com/tedivm/JShrink/master/src/JShrink/Minifier.php' );
+                        fwrite( $this->handle, $this->jshrink );
                         fclose( $this->handle );
                     }
                 
                     //Include jsmin
-                    require_once( dirname( __FILE__ ) .'/jsmin.php' );
+                    require_once( dirname( __FILE__ ) .'/jShrink.php' );
                 
                     //Minify the javascript
-                    $this->content = JSMin::minify( $this->content );
+                    $this->content = JShrink\Minifier::minify( $this->content, array( 'flaggedComments' => false ) );
 
                 } //end if( !$this->use_closure )
 
