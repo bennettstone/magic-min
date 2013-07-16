@@ -4,7 +4,7 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jsMin (https://github.com/rgrove/jsmin-php)
-** Version:         2.4.1
+** Version:         2.5
 ** Created:         01-Jun-2013
 ** Updated:         18-Jun-2013
 ** Author:          Bennett Stone
