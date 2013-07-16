@@ -305,7 +305,7 @@ class Minifier {
          * If the filename indicates that the contents are already minified, we'll just return the contents
          * If the switch is flipped (useful for loading things such as jquery via google cdn)
          */
-        if( preg_match( '/.min./i', $src_file ) || $run_minification === false )
+        if( preg_match( '/\.min\./i', $src_file ) || $run_minification === false )
         {
             return $this->source;
         }
@@ -418,6 +418,15 @@ class Minifier {
     private function make_min( $src_file, $new_file, $do_minify = true )
     {
         global $messages;
+        
+        $this->messages[]['Minifier note'] = 'Writing new file to '. dirname( $new_file );
+        
+        //Make sure the directory is writable
+        if( !is_writeable( dirname( $new_file ) ) )
+        {
+            $this->messages[]['Minifier ERROR'] = dirname( $new_file ) . ' is not writable.  Cannot create minified file.';
+            return false;
+        }
         
         //Output gzip data as needed, but default to none
         //Lengthy line usage is intentional to provide cleanly formatted fwrite contents
