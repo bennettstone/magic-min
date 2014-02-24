@@ -4,9 +4,9 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jsMin (https://github.com/rgrove/jsmin-php)
-** Version:         2.5
+** Version:         2.6
 ** Created:         01-Jun-2013
-** Updated:         18-Jun-2013
+** Updated:         24-Feb-2014
 ** Author:          Bennett Stone
 ** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
@@ -328,7 +328,7 @@ class Minifier {
                 /* remove comments */
                 $this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
                 /* remove tabs, spaces, newlines, etc. */
-                $this->content = str_replace( array("\r\n","\r","\n","\t",'  ','    ','     '), '', $this->content );
+                $this->content = preg_replace( '/(\s\s+|\t|\n)/', ' ', $this->content );
                 /* remove other spaces before/after ; */
                 $this->content = preg_replace( array('(( )+{)','({( )+)'), '{', $this->content );
                 $this->content = preg_replace( array('(( )+})','(}( )+)','(;( )*})'), '}', $this->content );
