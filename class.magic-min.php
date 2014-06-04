@@ -61,6 +61,8 @@ class Minifier {
     public $output_file;
     public $extension;
     private $type;
+    // remove comments
+    private $removeComments = true;
     //Return or echo the values
     private $print = true;
     //base64 images from CSS and include as part of the file?
@@ -130,6 +132,10 @@ class Minifier {
         {
             $this->messages[]['Minifier Log'] = 'jShrink enabled';
             $this->use_closure = false;
+        }
+        
+        if( isset( $vars['removeComments'] ) && $vars['removeComments'] === false ) {
+            $this->removeComments = false;  
         }
         
     } //end __construct()
@@ -326,7 +332,9 @@ class Minifier {
                 }
                 
                 /* remove comments */
-                $this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
+                if ($this->removeComments) {
+			$this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
+		}
                 /* remove tabs, spaces, newlines, etc. */
                 $this->content = preg_replace( '/(\s\s+|\t|\n)/', ' ', $this->content );
                 /* remove other spaces before/after ; */
@@ -399,7 +407,7 @@ class Minifier {
                     require_once( dirname( __FILE__ ) .'/jShrink.php' );
                 
                     //Minify the javascript
-                    $this->content = JShrink\Minifier::minify( $this->content, array( 'flaggedComments' => false ) );
+                    $this->content = JShrink\Minifier::minify( $this->content, array( 'flaggedComments' => !$this->removeComments ) );
 
                 } //end if( !$this->use_closure )
 
