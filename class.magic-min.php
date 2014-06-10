@@ -4,13 +4,13 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jsMin (https://github.com/rgrove/jsmin-php)
-** Version:         2.6
+** Version:         2.7
 ** Created:         01-Jun-2013
-** Updated:         24-Feb-2014
+** Updated:         09-Jun-2014
 ** Author:          Bennett Stone
 ** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
-** COPYRIGHT (c) 2013 BENNETT STONE
+** COPYRIGHT (c) 2014 BENNETT STONE
 **
 ** The source code included in this package is free software; you can
 ** redistribute it and/or modify it under the terms of the GNU General Public
@@ -61,23 +61,23 @@ class Minifier {
     public $output_file;
     public $extension;
     private $type;
-    // remove comments
-    private $removeComments = true;
-    //Return or echo the values
-    private $print = true;
-    //base64 images from CSS and include as part of the file?
-    private $merge_images = false;
-    //Use google closure (utilizes cURL)
-    private $use_closure = true;
     //Max image size for inclusion
     const IMAGE_MAX_SIZE = 5;
     //For script execution time (src: http://bit.ly/18O3VWw)
     private $mtime;
-    private $timer = false;
-    //Output as php with gzip?
-    private $gzip = false;
     //Sum of output messages
     private $messages = array();
+    //array of settings to add-to/adjust
+    private $settings = array();
+    //List of available config keys that can be set via init
+    private $config_keys = array(
+        'echo' => true,             //Return or echo the values
+        'encode' => false,          //base64 images from CSS and include as part of the file?
+        'timer' => true,           //Ouput script execution time
+        'gzip' => false,            //Output as php with gzip?
+        'closure' => true,          //Use google closure (utilizes cURL)
+        'remove_comments' => true   // remove comments
+    );
     
     
     /**
@@ -89,53 +89,19 @@ class Minifier {
     public function __construct( $vars = array() )
     {
         global $messages;
-        
-        //Return vs echo (echo default)
-        if( isset( $vars['echo'] ) && $vars['echo'] == false )
+        $this->mtime = microtime( true );
+        foreach( $this->config_keys as $key => $default )
         {
-            $this->messages[]['Minifier Log'] = 'Echo for output';
-            $this->print = false;   
-        }
-        else
-        {
-            $this->print = true;
-        }
-        
-        //base64 images and include as part of CSS (default is false)
-        if( isset( $vars['encode'] ) && $vars['encode'] == true )
-        {
-            $this->messages[]['Minifier Log'] = 'Base64encoding enabled';
-            $this->merge_images = $vars['encode'];   
-        }
-        
-        //Output a timer (defaut is false)
-        if( isset( $vars['timer'] ) && $vars['timer'] == true )
-        {
-            $this->timer = true;
-            $this->mtime = microtime( true );   
-        }
-        
-        //Output files as php with gZip (default is false)
-        if( isset( $vars['gzip'] ) && $vars['gzip'] == true )
-        {
-            $this->messages[]['Minifier Log'] = 'Gzip enabled';
-            $this->gzip = true;
-        }
-        
-        //Use google closure API via cURL (defaults to false and will rely on jShrink-Minifier.php)
-        if( isset( $vars['closure'] ) && $vars['closure'] == true )
-        {
-            $this->messages[]['Minifier Log'] = 'Google Closure API enabled';
-            $this->use_closure = true;
-        }
-        else
-        {
-            $this->messages[]['Minifier Log'] = 'jShrink enabled';
-            $this->use_closure = false;
-        }
-        
-        if( isset( $vars['removeComments'] ) && $vars['removeComments'] === false ) {
-            $this->removeComments = false;  
+            if( isset( $vars[$key] ) )
+            {
+                $this->messages[]['Minifier Log'] = $key .': '. $vars[$key];
+                $this->settings[$key] = $vars[$key];
+            }
+            else
+            {
+                $this->messages[]['Minifier Log'] = $key .': '. $default;
+                $this->settings[$key] = $default;
+            }
         }
         
     } //end __construct()
@@ -180,7 +146,7 @@ class Minifier {
     
     /**
      * Function to seek out and replace image references within CSS with base64_encoded data streams
-     * Used in minify_contents function IF global for $this->merge_images
+     * Used in minify_contents function IF global for $this->encode
      * This function will retrieve the contents of local OR remote images, and is based on 
      * Matthias Mullie <minify@mullie.eu>'s function, "importFiles" from the JavaScript and CSS minifier
      * http://www.phpclasses.org/package/7519-PHP-Optimize-JavaScript-and-CSS-files.html
@@ -326,15 +292,17 @@ class Minifier {
             {
                 $this->content = $this->source;
                 //If the param is set to merge images into the css before minifying...
-                if( $this->merge_images )
+                if( $this->settings['encode'] )
                 {
                     $this->content = $this->merge_images( $src_file, $this->content );   
                 }
                 
                 /* remove comments */
-                if ($this->removeComments) {
-			$this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
-		}
+                if( $this->settings['remove_comments'] )
+                {
+                    $this->content = preg_replace( '!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $this->content );
+                }
+                
                 /* remove tabs, spaces, newlines, etc. */
                 $this->content = preg_replace( '/(\s\s+|\t|\n)/', ' ', $this->content );
                 /* remove other spaces before/after ; */
@@ -357,7 +325,7 @@ class Minifier {
                  * and writing to a local file for the class (just in case)
                  * If bool is passed for 'closure' => true during class initiation, cURL request processes
                  */
-                if( $this->use_closure )
+                if( $this->settings['closure'] )
                 {
                     
                     //Build the data array
@@ -389,7 +357,7 @@ class Minifier {
                     //close connection
                     curl_close( $h );
                     
-                } //end if( $this->use_closure )
+                } //end if( $this->settings['closure'] )
                 else
                 {
                     //Not using google closure, default to JShrink but make sure the file exists
@@ -407,9 +375,9 @@ class Minifier {
                     require_once( dirname( __FILE__ ) .'/jShrink.php' );
                 
                     //Minify the javascript
-                    $this->content = JShrink\Minifier::minify( $this->content, array( 'flaggedComments' => !$this->removeComments ) );
+                    $this->content = JShrink\Minifier::minify( $this->content, array( 'flaggedComments' => $this->settings['remove_comments'] ) );
 
-                } //end if( !$this->use_closure )
+                } //end if( !$this->settings['closure'] )
 
             } //end $this->type == 'js'
             
@@ -446,7 +414,7 @@ class Minifier {
         //Output gzip data as needed, but default to none
         //Lengthy line usage is intentional to provide cleanly formatted fwrite contents
         $this->prequel = '';
-        if( $this->gzip )
+        if( $this->settings['gzip'] )
         {
             $this->prequel = '<?php' . PHP_EOL;
             $this->prequel .= 'if( extension_loaded( "zlib" ) )' . PHP_EOL;
@@ -598,7 +566,7 @@ class Minifier {
         }
         
         //If we have gzip enabled, we must account for the .php extension
-        if( $this->gzip && ( strtolower( pathinfo( $file, PATHINFO_EXTENSION ) ) != '.php' ) )
+        if( $this->settings['gzip'] && ( strtolower( pathinfo( $file, PATHINFO_EXTENSION ) ) != '.php' ) )
         {
             $file .= '.php';
         }
@@ -653,7 +621,7 @@ class Minifier {
         }
         
         //Return the output filename or echo
-        if( $this->print )
+        if( $this->settings['echo'] )
         {
             echo $this->output_file;
         }
@@ -713,7 +681,7 @@ class Minifier {
          * Reassign the $output_filename if gzip is enabled as we must account for the .php
          * extension in order to prevent the file from being recreated
          */
-        if( $this->gzip && ( strtolower( pathinfo( $output_filename, PATHINFO_EXTENSION ) ) != '.php' ) )
+        if( $this->settings['gzip'] && ( strtolower( pathinfo( $output_filename, PATHINFO_EXTENSION ) ) != '.php' ) )
         {
             $output_filename .= '.php';
         }
@@ -781,7 +749,7 @@ class Minifier {
         }
         
         //Echo or return
-        if( $this->print )
+        if( $this->settings['echo'] )
         {
             echo $this->compressed;
         }
@@ -806,7 +774,7 @@ class Minifier {
         global $messages;
         
         //Add the timer the console.log output if desired
-        if( $this->timer )
+        if( $this->settings['timer'] )
         {
             $this->messages[]['Minifier Log: timer'] = 'MagicMin processed and loaded in '. ( microtime( true ) - $this->mtime ) .' seconds';
         }

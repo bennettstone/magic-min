@@ -49,6 +49,8 @@ First, include and initiate the class.  The class has been updated to use an arr
     * 'gzip' => true/false (default is false)
 5. Use the Google Closure API as opposed to jsmin (jsmin is default)
     * 'closure' => true (default is false)
+6. Retain or remove comments within file contents (Thanks to [muertet](https://github.com/muertet) for this one)
+    * 'remove_comments' => true/false (defaults to true)
 
 ```php
 require( 'class.magic-min.php' );

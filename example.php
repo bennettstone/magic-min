@@ -20,7 +20,8 @@ $vars = array(
     'encode' => true, 
     'timer' => true, 
     'gzip' => true, 
-    'closure' => true
+    'closure' => true, 
+    'remove_comments' => false
 );
 $minified = new Minifier( $vars );
 ?>
