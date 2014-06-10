@@ -496,7 +496,7 @@ class Minifier {
         else
         {
             //Strip the directory names from the $src_file array for security
-            $filenames = array_map( array( 'Minifier', 'strip_directory' ), $src_file );
+            $filenames = array_map( array( $this, 'strip_directory' ), $src_file );
             
             //Make a temporary var to store the data and write a TOC
             $this->compiled = '/**' . PHP_EOL;
