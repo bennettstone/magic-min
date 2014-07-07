@@ -29,13 +29,13 @@ Full usage examples are included in example.php, and this package is included wi
 Regular expressions and str_replace operators were removed 15-Jun-2013 for javascript minification due to inconsistencies, and have been replaced with:
 
 1. [JsMin](https://github.com/rgrove/jsmin-php) as the default
-    * If the jsmin.php file is not found in the same directory as class.magic-min.php, it will be retrieved from github and created in the same directory
+    * If the jsmin.php file is not found in the same directory as class.magic-min.php, it will be retrieved from github and created in the same directory automatically
     * JsMin is the default minification package used for javascript
 2. [Google Closure](https://developers.google.com/closure/compiler/)
     * To use google closure, add 'closure' => true to the class initation
 
 ##Basic Usage
-First, include and initiate the class.  The class has been updated to use an array with up to 4 key -> value pairs, all accept boolean values or can be omitted entirely:
+First, include and initiate the class.  The class has been updated to use an array with up to 7 key -> value pairs, all accept boolean values or can be omitted entirely:
 
 1. Base64 encoded images (**local or remote**) can automatically replace file references during generation.  This applies only to CSS files.
     * 'encode' => true/false (default is false)
@@ -51,6 +51,8 @@ First, include and initiate the class.  The class has been updated to use an arr
     * 'closure' => true (default is false)
 6. Retain or remove comments within file contents (Thanks to [muertet](https://github.com/muertet) for this one)
     * 'remove_comments' => true/false (defaults to true)
+7. Generate hashed filenames based on file generation time.  Allows for better cachebusting without the use of query string version numbers
+    * 'hashed_filenames' => false/true (defaults to false)
 
 ```php
 require( 'class.magic-min.php' );
@@ -72,6 +74,15 @@ $minified = new Minifier( array( 'encode' => true, 'gzip' => true ) );
 
 //Use google closure API, and gzip the resulting file
 $minified = new Minifier( array( 'gzip' => true, 'closure' => true ) );
+
+//Use google closure API, gzip the resulting file, and hash filenames
+$minified = new Minifier( 
+    array(
+        'gzip' => true, 
+        'closure' => true, 
+        'hashed_filenames' => true
+    )
+);
 ```
 
 Output a single minified stylesheet
