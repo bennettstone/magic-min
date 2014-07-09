@@ -3,10 +3,10 @@
 ** File:            class.magic-min.php
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
-** Dependencies:    jsMin (https://github.com/rgrove/jsmin-php)
+** Dependencies:    jShrink (https://github.com/tedious/JShrink)
 ** Version:         3.0.0
 ** Created:         01-Jun-2013
-** Updated:         07-Jul-2014
+** Updated:         09-Jul-2014
 ** Author:          Bennett Stone
 ** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
@@ -431,8 +431,8 @@ class Minifier {
                 
                 /**
                  * Migrated preg_replace and str_replace custom minification to use google closure API
-                 * OR jsMin on 15-Jun-2013 due to js minification irregularities with most regex's: 
-                 * https://github.com/tedivm/JShrink
+                 * OR jShrink on 15-Jun-2013 due to js minification irregularities with most regex's: 
+                 * https://github.com/tedious/JShrink
                  * https://developers.google.com/closure/compiler/
                  * Accomodates lack of local file for JShrink by getting contents from github
                  * and writing to a local file for the class (just in case)
@@ -484,7 +484,7 @@ class Minifier {
                         fclose( $this->handle );
                     }
                 
-                    //Include jsmin
+                    //Include jShrink
                     require_once( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'jShrink.php' );
                 
                     //Minify the javascript
