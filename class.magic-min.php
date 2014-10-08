@@ -4,7 +4,7 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jShrink (https://github.com/tedious/JShrink)
-** Version:         3.0.1
+** Version:         3.0.2
 ** Created:         01-Jun-2013
 ** Updated:         07-Oct-2014
 ** Author:          Bennett Stone
@@ -759,7 +759,7 @@ class Minifier {
             unlink( $file );
             
             //Regen cacheref
-            $minfile = $this->minified_filedata( $src_file, $file, true );
+            $minfile = $this->minified_filedata( $src_file, array( $file ), true );
             $file = $minfile->references;
             
             //Make the cached version
@@ -850,10 +850,10 @@ class Minifier {
             $output_filename .= '.php';
         }
         
-        $reference_files = ( is_array( $list_or_type ) && !empty( $list_or_type ) ) ? $list_or_type : $output_filename;
+        $reference_files = ( is_array( $list_or_type ) && !empty( $list_or_type ) ) ? $list_or_type : array( $output_filename );
         $minfile = $this->minified_filedata( $output_filename, $reference_files );
         $minified_name = $minfile->references;
-        $minified_filelist = $minfile->files;
+        $minified_filelist = !empty( $minfile->files ) ? $minfile->files : array();
 
         //Create a bool to determine if a new file needs to be created
         $this->create_new = false;

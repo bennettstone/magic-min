@@ -250,6 +250,9 @@ Which would in turn output the correct URI to the stylesheet:
 
 ###Changelog
 
+**3.0.2**
+* Bugfix to force arrays in minified_filedata requests
+
 **3.0.1**
 * Added support for protocol agnostic URIs such as '//ajax.googleapis.com/ajax/libs/...'
 * Added plug and play function to simplify merge functionality
