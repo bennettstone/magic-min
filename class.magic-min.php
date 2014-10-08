@@ -4,9 +4,9 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jShrink (https://github.com/tedious/JShrink)
-** Version:         3.0.0
+** Version:         3.0.1
 ** Created:         01-Jun-2013
-** Updated:         09-Jul-2014
+** Updated:         07-Oct-2014
 ** Author:          Bennett Stone
 ** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
@@ -133,6 +133,36 @@ class Minifier {
     
     
     /**
+     * Private function used to automatically add URI schemes to 
+     * assets in order for them to have their contents retrieved
+     * ONLY WORKS to add schemes to URI's prefixed with "//" to 
+     * handle protocol irrelevant loading when using either http or https
+     *
+     * For example, the following file WOULD work:
+     * //ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js
+     *
+     * While, the following would NOT work:
+     * ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js
+     *
+     * @access private
+     * @param string $uri
+     * @param string $scheme
+     * @return string
+     */
+    private function add_uri_scheme( $uri, $scheme = 'http:' )
+    {
+        if( substr( $uri, 0, 2 ) == '//' )
+        {
+            return parse_url( $uri, PHP_URL_SCHEME ) === null ? $scheme . $uri : $uri;   
+        }
+        else
+        {
+            return $uri;
+        }
+    }
+    
+    
+    /**
      * Private function to determine if files are local or remote
      * Used for merge_images() and minify() to determine if filemtime can be used
      *
@@ -189,14 +219,14 @@ class Minifier {
      * @param bool $regen (wipe to recreate contents of cachefile, defaults to false)
      * @return object (for less-array-ey bracket retrieval)
      */
-    private function minified_filedata( $source_file, $reference_file, $regen = false )
+    private function minified_filedata( $source_file, $reference_files = array(), $regen = false )
     {   
-        if( $this->settings['hashed_filenames'] && is_dir( dirname( $reference_file ) ) && is_writable( dirname( $reference_file ) ) )
+        if( $this->settings['hashed_filenames'] && is_dir( dirname( $source_file ) ) && is_writable( dirname( $source_file ) ) )
         {
             //Reference filename to create
             $cache_refname = sha1( $source_file ) .'.txt';
             
-            $checkfile = dirname( $reference_file ) . DIRECTORY_SEPARATOR . $cache_refname;
+            $checkfile = dirname( $source_file ) . DIRECTORY_SEPARATOR . $cache_refname;
             
             if( file_exists( $checkfile ) && !$regen )
             {
@@ -205,21 +235,22 @@ class Minifier {
             }
             else
             {
-                $new_ext = strtolower( pathinfo( $reference_file, PATHINFO_EXTENSION ) );
+                $new_ext = strtolower( pathinfo( $source_file, PATHINFO_EXTENSION ) );
                 if( $new_ext == 'php' )
                 {
-                    $reference_file = rtrim( strtolower( $reference_file ), '.php' );
-                    $new_ext = strtolower( pathinfo( $reference_file, PATHINFO_EXTENSION ) ) .'.php';
+                    $source_file = rtrim( strtolower( $source_file ), '.php' );
+                    $new_ext = strtolower( pathinfo( $source_file, PATHINFO_EXTENSION ) ) .'.php';
                 }
+
                 
                 $time = $this->gmstamp();
                 $data = array(
-                    'file' => $source_file, 
-                    'references' => dirname( $reference_file ) . DIRECTORY_SEPARATOR. sha1( $time ) . '.'. $new_ext, 
+                    'files' => $reference_files, 
+                    'references' => dirname( $source_file ) . DIRECTORY_SEPARATOR. sha1( $time ) . '.'. $new_ext, 
                     'filemtime' => $time, 
                     'generated' => $time
                 );
-                
+
                 //If we need to regen, just wipe the contents of the file
                 if( $regen === true )
                 {
@@ -233,12 +264,12 @@ class Minifier {
         }
         else
         {
-            if( file_exists( $reference_file ) )
+            if( file_exists( $source_file ) )
             {
                 $data = array(
-                    'file' => $source_file, 
-                    'references' => $reference_file, 
-                    'filemtime' => $this->gmstamp( filemtime( $reference_file ) ), 
+                    'files' => $reference_files, 
+                    'references' => $source_file, 
+                    'filemtime' => $this->gmstamp( filemtime( $source_file ) ), 
                     'generated' => $this->gmstamp( filemtime( $source_file ) )
                 );
             }
@@ -246,8 +277,8 @@ class Minifier {
             {
                 $time = $this->gmstamp();
                 $data = array(
-                    'file' => $source_file, 
-                    'references' => $reference_file, 
+                    'files' => $reference_files, 
+                    'references' => $source_file, 
                     'filemtime' => $time, 
                     'generated' => $time
                 );
@@ -610,9 +641,7 @@ class Minifier {
                     //Remote files should not have compressed content
                     $do_minify = false;
                 }
-                
-                //Add the sourcefile minified content
-                $this->compiled .= PHP_EOL . PHP_EOL . '/* Filename: '. basename( $this->new_file ) . ' */' . PHP_EOL;
+        
                 $this->compiled .= $this->minify_contents( $this->new_file, $do_minify );
             }
             
@@ -679,6 +708,9 @@ class Minifier {
     {
         global $messages;
         
+        //Handle double slash prefixed remote filenames, as well as checking relative filenames
+        $src_file = $this->add_uri_scheme( $src_file );
+        
         //Since the $file (output) filename is optional, if empty, just add .min.[ext]
         if( empty( $file ) )
         {
@@ -695,7 +727,7 @@ class Minifier {
             $file .= '.php';
         }
         
-        $minfile = $this->minified_filedata( $src_file, $file );
+        $minfile = $this->minified_filedata( $src_file, array( $file ) );
         $file = $minfile->references;
         
         //The source file is remote, and we can't check for an updated version anyway
@@ -818,8 +850,10 @@ class Minifier {
             $output_filename .= '.php';
         }
         
-        $minfile = $this->minified_filedata( $output_filename, $output_filename );
+        $reference_files = ( is_array( $list_or_type ) && !empty( $list_or_type ) ) ? $list_or_type : $output_filename;
+        $minfile = $this->minified_filedata( $output_filename, $reference_files );
         $minified_name = $minfile->references;
+        $minified_filelist = $minfile->files;
 
         //Create a bool to determine if a new file needs to be created
         $this->create_new = false;
@@ -836,8 +870,11 @@ class Minifier {
             foreach( $order as $this->file )
             {
                 
+                //Handle protocol irrelevant URIs such as '//ajax.google...'
+                $this->file = $this->add_uri_scheme( $this->file );
+                
                 //Check each file for modification greater than the output file if it exists
-                if( file_exists( $minified_name ) && ( $this->file != $output_filename ) && ( !$this->remote_file( $this->file ) ) && ( $this->gmstamp( filemtime( $this->file ) ) > $minfile->filemtime ) )
+                if( file_exists( $minified_name ) && ( $this->file != $output_filename ) && ( !$this->remote_file( $this->file ) ) && ( $this->gmstamp( filemtime( $this->file ) ) > $minfile->filemtime ) || !in_array( $this->file, $minified_filelist ) )
                 {
                     $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
                     $this->create_new = true;
@@ -856,12 +893,15 @@ class Minifier {
         //Loop through the directory grabbing files along the way
         foreach( $this->directory as $this->file )
         {
+         
+            //Handle protocol irrelevant URIs such as '//ajax.google...'
+            $this->file = $this->add_uri_scheme( $this->file );
             
             //Make sure we didn't want to exclude this file before adding it
             if( !in_array( $this->file, $exclude ) && ( $this->file != $minified_name ) )
             {
                 //Check each file for modification greater than the output file if it exists
-                if( file_exists( $minified_name ) && ( !$this->remote_file( $this->file ) ) && ( $this->gmstamp( filemtime( $this->file ) ) > $minfile->filemtime ) )
+                if( file_exists( $minified_name ) && ( !$this->remote_file( $this->file ) ) && ( $this->gmstamp( filemtime( $this->file ) ) > $minfile->filemtime ) || !in_array( $this->file, $minified_filelist ) )
                 {
                     $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
                     $this->create_new = true;
@@ -871,6 +911,12 @@ class Minifier {
             }
             
         } //End foreach( $this->directory )
+        
+        //Check to see that we have the same number of files passed to the function as were stored
+        if( count( $minified_filelist ) != count( $this->compilation ) )
+        {
+            $this->create_new = true;
+        }
 
         //Only recreate the file as needed
         if( file_exists( $minified_name ) && $this->create_new )
@@ -880,7 +926,7 @@ class Minifier {
             unlink( $minified_name );
             
             //Regen cacheref
-            $minfile = $this->minified_filedata( $output_filename, $minified_name, true );
+            $minfile = $this->minified_filedata( $output_filename, $this->compilation, true );
             $output_filename = $minfile->references;
             
             //Group and minify the contents
@@ -890,7 +936,7 @@ class Minifier {
         elseif( !file_exists( $minified_name ) )
         {
             //Regen cacheref
-            $minfile = $this->minified_filedata( $output_filename, $minified_name, true );
+            $minfile = $this->minified_filedata( $output_filename, $this->compilation, true );
             $output_filename = $minfile->references;
             
             //Group and minify the contents

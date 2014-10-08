@@ -246,3 +246,13 @@ Which would in turn output the correct URI to the stylesheet:
 ```html
 <link rel="stylesheet" href="http://yourwebsite.com/wp-content/themes/yourtheme/css/master.min.css" />
 ```
+
+
+###Changelog
+
+**3.0.1**
+* Added support for protocol agnostic URIs such as '//ajax.googleapis.com/ajax/libs/...'
+* Added plug and play function to simplify merge functionality
+* Bugfix for merge functionality when using file list
+  * Altered minified_filedata to stored full list of files contained in minified package
+  * Added support for automatic re-minification when the number of files passed to the "merge" function changes
