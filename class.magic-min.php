@@ -4,9 +4,9 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jShrink (https://github.com/tedious/JShrink)
-** Version:         3.0.2
+** Version:         3.0.3
 ** Created:         01-Jun-2013
-** Updated:         07-Oct-2014
+** Updated:         08-Oct-2014
 ** Author:          Bennett Stone
 ** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
@@ -59,7 +59,8 @@
 **   'gzip' => true, 
 **   'encode' => true, 
 **   'remove_comments' => true, 
-**   'hashed_filenames' => true
+**   'hashed_filenames' => true, 
+**   'output_log' => true
 ** );
 ** $minified = new Minifier( $vars );
 **
@@ -76,18 +77,19 @@ class Minifier {
     //For script execution time (src: http://bit.ly/18O3VWw)
     private $mtime;
     //Sum of output messages
-    private $messages = array();
+    private static $messages = array();
     //array of settings to add-to/adjust
     private $settings = array();
     //List of available config keys that can be set via init
     private $config_keys = array(
-        'echo' => true,             //Return or echo the values
-        'encode' => false,          //base64 images from CSS and include as part of the file?
-        'timer' => true,            //Ouput script execution time
-        'gzip' => false,            //Output as php with gzip?
-        'closure' => true,          //Use google closure (utilizes cURL)
-        'remove_comments' => true,  // remove comments, 
-        'hashed_filenames' => false //Generate hashbased filenames to break caches
+        'echo' => true,                 //Return or echo the values
+        'encode' => false,              //base64 images from CSS and include as part of the file?
+        'timer' => true,                //Ouput script execution time
+        'gzip' => false,                //Output as php with gzip?
+        'closure' => true,              //Use google closure (utilizes cURL)
+        'remove_comments' => true,      //Remove comments, 
+        'hashed_filenames' => false,    //Generate hashbased filenames to break caches, 
+        'output_log' => false           //Output logs automatically at end of file output
     );
     
     
@@ -98,19 +100,18 @@ class Minifier {
      * @return mixed
      */
     public function __construct( $vars = array() )
-    {
-        global $messages;
+    {;
         $this->mtime = microtime( true );
         foreach( $this->config_keys as $key => $default )
         {
             if( isset( $vars[$key] ) )
             {
-                $this->messages[]['Minifier Log'] = $key .': '. $vars[$key];
+                self::$messages[]['Minifier Log'] = $key .': '. $vars[$key];
                 $this->settings[$key] = $vars[$key];
             }
             else
             {
-                $this->messages[]['Minifier Log'] = $key .': '. $default;
+                self::$messages[]['Minifier Log'] = $key .': '. $default;
                 $this->settings[$key] = $default;
             }
         }
@@ -173,7 +174,7 @@ class Minifier {
     private function remote_file( $file )
     {
         //It is a remote file
-        if( preg_match( "/(http|https)/", $file ) )
+        if( substr( $file, 0, 4 ) == 'http' )
         {
             return true;
         }
@@ -301,9 +302,7 @@ class Minifier {
      * @return string $updated_style
      */
     private function merge_images( $source_file, $contents )
-    {
-        global $messages;
-        
+    {   
         $this->directory = dirname( $source_file ) . DIRECTORY_SEPARATOR;
 
         if( preg_match_all( '/url\((["\']?)((?!["\']?data:).*?\.(gif|png|jpg|jpeg))\\1\)/i', $contents, $this->matches, PREG_SET_ORDER ) )
@@ -377,7 +376,7 @@ class Minifier {
             }
 
             //Log the number of replacements to the console
-            $this->messages[]['Minifier Log: merge_images'] = count( $this->replace ) .' files base64_encoded into ' . $source_file;
+            self::$messages[]['Minifier Log: merge_images'] = count( $this->replace ) .' files base64_encoded into ' . $source_file;
             
             //Find and replace all the images with the base64 data
             $this->updated_style = str_replace( $this->find, $this->replace, $contents );
@@ -405,14 +404,12 @@ class Minifier {
      */
     private function minify_contents( $src_file, $run_minification = true )
     {
-        global $messages;
-
         $this->source = @file_get_contents( $src_file );   
     
         //Log the error and continue if we can't get the file contents
         if( !$this->source )
         {
-            $this->messages[]['Minifier ERROR'] = 'Unable to retrieve the contents of '. $src_file . '.  Skipping at '. __LINE__ .' in '. basename( __FILE__ );
+            self::$messages[]['Minifier ERROR'] = 'Unable to retrieve the contents of '. $src_file . '.  Skipping at '. __LINE__ .' in '. basename( __FILE__ );
             
             //This will cause  potential js errors, but allow the script to continue processing while notifying the user via console
             $this->source = '';
@@ -465,6 +462,7 @@ class Minifier {
                  * OR jShrink on 15-Jun-2013 due to js minification irregularities with most regex's: 
                  * https://github.com/tedious/JShrink
                  * https://developers.google.com/closure/compiler/
+                 * https://developers.google.com/closure/compiler/docs/api-ref
                  * Accomodates lack of local file for JShrink by getting contents from github
                  * and writing to a local file for the class (just in case)
                  * If bool is passed for 'closure' => true during class initiation, cURL request processes
@@ -475,7 +473,7 @@ class Minifier {
                     //Build the data array
                     $data = array(
                         'compilation_level' => 'SIMPLE_OPTIMIZATIONS',
-                        'output_format' => 'text', 
+                        'output_format' => 'json', 
                         'output_info' => 'compiled_code', 
                         'js_code' => urlencode( $this->content )
                     );
@@ -496,7 +494,19 @@ class Minifier {
                     curl_setopt( $h, CURLOPT_HEADER, false );
                     curl_setopt( $h, CURLOPT_RETURNTRANSFER, 1 );
                     $result = curl_exec( $h );
-                    $this->content = $result;
+                    $result_raw = json_decode( $result, true );
+                    
+                    //If we've made too many requests, or passed bad data, our js will be broken
+                    if( isset( $result_raw['serverErrors'] ) && !empty( $result_raw['serverErrors'] ) )
+                    {
+                        $e_code = $result_raw['serverErrors'][0]['code'];
+                        $e_message = $result_raw['serverErrors'][0]['error'];
+                        self::$messages[]['Minifier ERROR'] = $e_code . ': '. $e_message . ' File: '. basename( $src_file ) . '.  Returning unminified contents.';
+                    }
+                    else
+                    {
+                        $this->content = $result_raw['compiledCode'];   
+                    }
 
                     //close connection
                     curl_close( $h );
@@ -507,7 +517,7 @@ class Minifier {
                     //Not using google closure, default to JShrink but make sure the file exists
                     if( !file_exists( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'jShrink.php' ) )
                     {
-                        $this->messages[]['Minifier Log'] = 'jShrink does not exist locally.  Retrieving...';
+                        self::$messages[]['Minifier Log'] = 'jShrink does not exist locally.  Retrieving...';
                         
                         $this->handle = fopen( dirname( __FILE__ ) . DIRECTORY_SEPARATOR . 'jShrink.php', 'w' );
                         $this->jshrink = file_get_contents( 'https://raw.github.com/tedivm/JShrink/master/src/JShrink/Minifier.php' );
@@ -543,15 +553,13 @@ class Minifier {
      * @return string new filename/location (same as path to variable)
      */
     private function make_min( $src_file, $new_file, $do_minify = true )
-    {
-        global $messages;
-        
-        $this->messages[]['Minifier note'] = 'Writing new file to '. dirname( $new_file );
+    {        
+        self::$messages[]['Minifier note'] = 'Writing new file to '. dirname( $new_file );
         
         //Make sure the directory exists and is writable
         if( !is_dir( dirname( $new_file ) ) || !is_writeable( dirname( $new_file ) ) )
         {
-            $this->messages[]['Minifier ERROR'] = dirname( $new_file ) . ' is not writable.  Cannot create minified file.';
+            self::$messages[]['Minifier ERROR'] = dirname( $new_file ) . ' is not writable.  Cannot create minified file.';
             trigger_error( dirname( $new_file ) . ' is not writable.  Cannot create minified file.' );
             return false;
         }
@@ -666,7 +674,7 @@ class Minifier {
         //Log any error messages from the new file creation
         if( !$this->handle )
         {
-            $this->messages[]['Minifier ERROR'] = 'Unable to open file:  '.$new_file;
+            self::$messages[]['Minifier ERROR'] = 'Unable to open file:  '.$new_file;
             trigger_error( 'Unable to open file:  '.$new_file );
             return false;
         }
@@ -679,7 +687,7 @@ class Minifier {
             touch( $new_file, $this->gmstamp() );
             
             //Log to the console
-            $this->messages[]['Minifier Log: New file'] = 'Successfully created '. $new_file;
+            self::$messages[]['Minifier Log: New file'] = 'Successfully created '. $new_file;
 
             //Return filename and location
             return $new_file;   
@@ -706,8 +714,6 @@ class Minifier {
      */
     public function minify( $src_file, $file = '', $version = '' )
     {
-        global $messages;
-        
         //Handle double slash prefixed remote filenames, as well as checking relative filenames
         $src_file = $this->add_uri_scheme( $src_file );
         
@@ -741,7 +747,7 @@ class Minifier {
             $this->output_file = $this->make_min( $src_file, $file, false );
             
             //Add the filename to the output log
-            $this->messages[]['Minifier Log: minify'] = 'Retrieving contents of '.$src_file .' to add to '.$file;
+            self::$messages[]['Minifier Log: minify'] = 'Retrieving contents of '.$src_file .' to add to '.$file;
         }
         //The file already exists and doesn't need to be recreated
         elseif( ( file_exists( $file ) && file_exists( $src_file ) ) && ( $this->gmstamp( filemtime( $src_file ) ) < $minfile->filemtime ) )
@@ -766,7 +772,7 @@ class Minifier {
             $this->output_file = $this->make_min( $src_file, $file );
             
             //Add to the console.log output
-            $this->messages[]['Minifier Log: minify'] = 'Made new version of '.$src_file.' into '.$file;
+            self::$messages[]['Minifier Log: minify'] = 'Made new version of '.$src_file.' into '.$file;
         }
         //The minified file doesn't exist, make one
         else
@@ -775,7 +781,7 @@ class Minifier {
             $this->output_file = $this->make_min( $src_file, $file );
             
             //Add to the console.log output if desired
-            $this->messages[]['Minifier Log: minify'] = 'Made new version of '.$src_file.' into '.$file;
+            self::$messages[]['Minifier Log: minify'] = 'Made new version of '.$src_file.' into '.$file;
         }
 
         //Add the ? params if they exist
@@ -821,7 +827,6 @@ class Minifier {
      */
     public function merge( $output_filename, $directory, $list_or_type = 'js', $exclude = array(), $order = array() )
     {
-        global $messages;
         
         /**
          * Added selective inclusion to override glob and exclusion 13-Jun-2013 ala Ray Beriau
@@ -865,7 +870,7 @@ class Minifier {
         if( !empty( $order ) )
         {
             
-            $this->messages[]['Minifier Log: Merge order'] = 'Order specified with '. count( $order ) .' files';
+            self::$messages[]['Minifier Log: Merge order'] = 'Order specified with '. count( $order ) .' files';
             
             foreach( $order as $this->file )
             {
@@ -876,7 +881,7 @@ class Minifier {
                 //Check each file for modification greater than the output file if it exists
                 if( file_exists( $minified_name ) && ( $this->file != $output_filename ) && ( !$this->remote_file( $this->file ) ) && ( $this->gmstamp( filemtime( $this->file ) ) > $minfile->filemtime ) || !in_array( $this->file, $minified_filelist ) )
                 {
-                    $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
+                    self::$messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
                     $this->create_new = true;
                 }
                 
@@ -903,7 +908,7 @@ class Minifier {
                 //Check each file for modification greater than the output file if it exists
                 if( file_exists( $minified_name ) && ( !$this->remote_file( $this->file ) ) && ( $this->gmstamp( filemtime( $this->file ) ) > $minfile->filemtime ) || !in_array( $this->file, $minified_filelist ) )
                 {
-                    $this->messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
+                    self::$messages[]['Minifier Log: New File Flagged'] = 'Flagged for update by '. $this->file;
                     $this->create_new = true;
                 }
                 
@@ -969,31 +974,43 @@ class Minifier {
      * @return string
      */
     public function logs()
-    {
-        global $messages;
-        
+    {   
         //Add the timer the console.log output if desired
         if( $this->settings['timer'] )
         {
-            $this->messages[]['Minifier Log: timer'] = 'MagicMin processed and loaded in '. ( microtime( true ) - $this->mtime ) .' seconds';
+            self::$messages[]['Minifier Log: timer'] = 'MagicMin processed and loaded in '. ( microtime( true ) - $this->mtime ) .' seconds';
         }
         
-        if( !empty( $this->messages ) )
+        if( !empty( self::$messages ) )
         {
             
-            echo '<script>';
-            foreach( $this->messages as $this->data )
+            echo PHP_EOL . '<script>' . PHP_EOL;
+            foreach( self::$messages as $this->data )
             {
                 foreach( $this->data as $this->type => $this->output )
                 {
                     echo 'console.log("'.$this->type .' : '. $this->output.'");' . PHP_EOL;   
                 }
             }
-            echo '</script>';
+            echo '</script>' . PHP_EOL;
         
         } //end !empty( $this-messages )
 
     } //end logs()
+    
+    
+    /**
+     * Allow logs to be automatically output at script completion
+     * Dependent on 'output_log' configuration variable set to true
+     *
+     */
+    public function __destruct()
+    {
+        if( $this->settings['output_log'] === true )
+        {
+            $this->logs();
+        }
+    } //end __destruct()
     
 
 } //End class Minifier
