@@ -1,0 +1,17 @@
+{
+    "name": "bennettstone/magicmin",
+    "type": "library",
+    "description": "MagicMin is a PHP based javascript and stylesheet minification and merging class designed to generate minified, merged, and automatically updating files to simplify the process of minified file usage and updating when going between production and development environments.",
+    "authors": [
+        {
+            "name": "Bennett Stone",
+            "homepage": "http://phpdevtips.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.1.0"
+    }, 
+    "autoload": {
+        "files": ["class.magic-min.php"]
+    }
+}
