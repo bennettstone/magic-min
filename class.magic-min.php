@@ -4,13 +4,13 @@
 ** Class:           MagicMin
 ** Description:     Javascript and CSS minification/merging class to simplify movement from development to production versions of files
 ** Dependencies:    jShrink (https://github.com/tedious/JShrink)
-** Version:         3.0.3
+** Version:         3.0.4
 ** Created:         01-Jun-2013
-** Updated:         08-Oct-2014
+** Updated:         21-Mar-2015
 ** Author:          Bennett Stone
 ** Homepage:        www.phpdevtips.com 
 **------------------------------------------------------------------------------
-** COPYRIGHT (c) 2014 BENNETT STONE
+** COPYRIGHT (c) 2015 BENNETT STONE
 **
 ** The source code included in this package is free software; you can
 ** redistribute it and/or modify it under the terms of the GNU General Public
@@ -89,7 +89,8 @@ class Minifier {
         'closure' => true,              //Use google closure (utilizes cURL)
         'remove_comments' => true,      //Remove comments, 
         'hashed_filenames' => false,    //Generate hashbased filenames to break caches, 
-        'output_log' => false           //Output logs automatically at end of file output
+        'output_log' => false,          //Output logs automatically at end of file output, 
+        'force_rebuild' => false,       //Brute force rebuild of minified assets- USE SPARINGLY!
     );
     
     
@@ -100,7 +101,7 @@ class Minifier {
      * @return mixed
      */
     public function __construct( $vars = array() )
-    {;
+    {
         $this->mtime = microtime( true );
         foreach( $this->config_keys as $key => $default )
         {
@@ -115,7 +116,6 @@ class Minifier {
                 $this->settings[$key] = $default;
             }
         }
-        
     } //end __construct()
     
 	
@@ -750,7 +750,7 @@ class Minifier {
             self::$messages[]['Minifier Log: minify'] = 'Retrieving contents of '.$src_file .' to add to '.$file;
         }
         //The file already exists and doesn't need to be recreated
-        elseif( ( file_exists( $file ) && file_exists( $src_file ) ) && ( $this->gmstamp( filemtime( $src_file ) ) < $minfile->filemtime ) )
+        elseif( ( $this->settings['force_rebuild'] === true ) || ( file_exists( $file ) && file_exists( $src_file ) ) && ( $this->gmstamp( filemtime( $src_file ) ) < $minfile->filemtime ) )
         {
             
             //No change, so the output is the same as the input
@@ -758,7 +758,7 @@ class Minifier {
 
         }
         //The file exists, but the development version is newer
-        elseif( ( file_exists( $file ) && file_exists( $src_file ) ) && ( $this->gmstamp( filemtime( $src_file ) ) > $minfile->filemtime ) )
+        elseif( ( $this->settings['force_rebuild'] === true ) || ( file_exists( $file ) && file_exists( $src_file ) ) && ( $this->gmstamp( filemtime( $src_file ) ) > $minfile->filemtime ) )
         {
             //Remove the file so we can do a clean recreate
             chmod( $file, 0777 );
@@ -863,6 +863,13 @@ class Minifier {
         //Create a bool to determine if a new file needs to be created
         $this->create_new = false;
         
+        //Allow brute force rebuild from construct param
+        if( $this->settings['force_rebuild'] === true )
+        {
+            self::$messages[]['Minifier Log: Force Rebuild'] = 'Force rebuild set to true';
+            $this->create_new = true;
+        }
+        
         //Start the array of files to add to the cache
         $this->compilation = array();
         
@@ -926,6 +933,8 @@ class Minifier {
         //Only recreate the file as needed
         if( file_exists( $minified_name ) && $this->create_new )
         {
+            self::$messages[]['Minifier Log: Creating new'] = $minified_name .' exists but flagged for new';
+            
             //Remove the file so we can do a clean recreate
             chmod( $minified_name, 0777 );
             unlink( $minified_name );

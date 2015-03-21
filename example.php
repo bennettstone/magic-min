@@ -21,7 +21,9 @@ $vars = array(
     'timer' => true, 
     'gzip' => true, 
     'closure' => true, 
-    'remove_comments' => false
+    'remove_comments' => false, 
+    'force_rebuild' => false, //USE THIS SPARINGLY!
+    'hashed_filenames' => true, 
 );
 $minified = new Minifier( $vars );
 ?>

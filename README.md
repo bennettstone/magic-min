@@ -55,6 +55,8 @@ First, include and initiate the class.  The class has been updated to use an arr
     * 'hashed_filenames' => false/true (defaults to false)
 8. Automatically output the results of operations taken by MagicMin to the javascript console.  Same as calling $minified->logs(), but without needing to add an explicit call to the "logs()" function
     * 'output_log' => false/true (defaults to false)
+9. Brute force recompile merged and minified files for use during development
+    * 'force_rebuild' => false/true (default false, use sparingly!)
 
 ```php
 require( 'class.magic-min.php' );
@@ -254,6 +256,9 @@ Which would in turn output the correct URI to the stylesheet:
 
 
 ###Changelog
+
+**3.0.4**
+* Added brute force option to recompile minified assets
 
 **3.0.3**
 * Added output_log to configuration options to output to console automatically
