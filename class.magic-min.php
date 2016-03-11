@@ -450,6 +450,8 @@ class Minifier {
                 $this->content = preg_replace( array('(( )+{)','({( )+)'), '{', $this->content );
                 $this->content = preg_replace( array('(( )+})','(}( )+)','(;( )*})'), '}', $this->content );
                 $this->content = preg_replace( array('(;( )+)','(( )+;)'), ';', $this->content );
+                /* remove spaces after : */
+                $this->content = preg_replace( '(:( )*)', ':', $this->content );
 
             } //end $this->type == 'css'
             
